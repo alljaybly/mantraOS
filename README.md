@@ -132,19 +132,42 @@ Since this is a vanilla web application, there is no complex build process.
     ```
 
 3.  **Run locally:**
-    - Simply open the `index.html` file in a modern web browser.
-    - For the best experience (and to enable PWA features), serve the file using a local server.
-      
-      **Using Python:**
-      ```bash
-      python -m http.server
-      ```
-      
-      **Using Node.js (if you have `serve` installed):**
-      ```bash
-      npx serve .
-      ```
-      Then, open `http://localhost:[PORT]` in your browser.
+    You can open the `index.html` file directly in your browser. However, for the best experience and to enable Progressive Web App (PWA) features like the "Install App" button, you must serve the files from a local web server. This is because modern browser security policies restrict PWA features to `http` or `https` protocols, not the `file://` protocol used when opening files directly.
+
+    Here are a few ways to start a local server:
+
+    #### Using Node.js
+    If you have Node.js installed, you can use a simple package like `serve`.
+
+    1.  **Install `serve` globally (one-time setup):**
+        ```bash
+        npm install -g serve
+        ```
+    2.  **Run the server from the project directory:**
+        ```bash
+        serve .
+        ```
+    
+    An alternative to `serve` is `live-server`, which automatically reloads the page when you make changes.
+    1.  **Install `live-server` globally:** `npm install -g live-server`
+    2.  **Run it:** `live-server`
+
+    #### Using Python
+    If you have Python installed, you can use its built-in web server.
+
+    -   For Python 3:
+        ```bash
+        python -m http.server
+        ```
+    -   For Python 2:
+        ```bash
+        python -m SimpleHTTPServer
+        ```
+
+    #### Using VS Code
+    If you use Visual Studio Code, a popular and easy-to-use option is the [Live Server extension](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer). Once installed, you can right-click the `index.html` file and select "Open with Live Server".
+
+    After starting the server with any of these methods, open the provided URL (e.g., `http://localhost:3000`, `http://localhost:8000`) in your browser to use the application.
 
 ## 🤝 Contributing
 
