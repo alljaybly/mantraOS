@@ -47,7 +47,7 @@ Built as a self-contained, **zero-dependency vanilla JavaScript application**, i
 
 ## 🌐 Live Demo
 
-Check out the live version of MantraOS here: **[Live Demo Link Coming Soon]**
+Check out the live version of MantraOS here: **[https://mantraos.netlify.app]**
 
 ## 📸 Screenshots
 
@@ -55,17 +55,17 @@ Check out the live version of MantraOS here: **[Live Demo Link Coming Soon]**
 
 | Onboarding | Dashboard |
 | :---: | :---: |
-| ![Onboarding Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Onboarding) | ![Dashboard Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Dashboard) |
+| ![Onboarding Screen](https://github.com/alljaybly/mantraOS/blob/main/Onboarding.png) | ![Dashboard Screen](https://github.com/alljaybly/mantraOS/blob/main/Dashboard.png) |
 | *Seamless setup to personalize your experience.* | *Your daily mantra with voice controls and stats.* |
 
 | Library | Progress |
 | :---: | :---: |
-| ![Library Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Library) | ![Progress Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Progress) |
+| ![Library Screen](https://github.com/alljaybly/mantraOS/blob/main/Library.png) | ![Progress Screen](https://github.com/alljaybly/mantraOS/blob/main/Progress.png) |
 | *Manage your collection and record your voice.* | *Track your consistency and unlock achievements.* |
 
 | Settings |
 | :---: |
-| ![Settings Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Settings) |
+| ![Settings Screen](https://github.com/alljaybly/mantraOS/blob/main/Settings.png) |
 | *Customize themes, sounds, and advanced features.* |
 
 
