@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Offline-capable-green.svg" alt="Offline Capable">
 </p>
 
-**MantraOS** is a motivational progressive web application (PWA) designed to help you cultivate a positive mindset. Choose from a curated library, create your own powerful mantras, track your progress, and receive smart notifications to stay inspired throughout your day.
+**MantraOS** is a motivational progressive web application (PWA) designed to help you cultivate a positive mindset. Choose from a curated library, create your own powerful mantras, record your own voice, track your progress, and receive smart notifications to stay inspired throughout your day.
 
 Built as a self-contained, **zero-dependency vanilla JavaScript application**, it's fast, private, reliable, and works completely offline.
 
@@ -18,10 +18,12 @@ Built as a self-contained, **zero-dependency vanilla JavaScript application**, i
 | Feature                 | Description                                                                 | Status |
 | ----------------------- | --------------------------------------------------------------------------- | :----: |
 | **Personalized Mantras**  | Select from a curated library or create your own custom affirmations.       |   ✅    |
-| **Progress Tracking**     | Visualize your consistency with streaks, stats, and an activity calendar. |   ✅    |
-| **Achievements**        | Unlock badges for reaching milestones on your journey.                      |   ✅    |
-| **Full Customization**  | Choose themes, fonts, and enable a sleek dark mode.                         |   ✅    |
-| **Smart Notifications** | Set reminders for mantras and daily affirmations.                           |   ✅    |
+| **Voice Recording**     | Record your own voice for each mantra for a personalized experience.        |   ✅    |
+| **Progress Tracking**     | Visualize consistency with streaks, stats, and an activity calendar.        |   ✅    |
+| **Motivational Feedback** | Celebrate daily goals and streaks with animations and sounds.               |   ✅    |
+| **Undo/Redo System**    | Easily revert or re-apply recent actions like mantra changes or settings.   |   ✅    |
+| **Full Customization**  | Choose themes, fonts, dark mode, and enable haptic feedback.              |   ✅    |
+| **Automatic Slideshow** | Let your mantras cycle automatically on the dashboard with custom timing.   |   ✅    |
 | **PWA & Offline-First** | Install on your device and use it anywhere, with or without a connection. |   ✅    |
 | **Data Portability**    | Export and import all your data with a single click. No lock-in.          |   ✅    |
 
@@ -54,17 +56,17 @@ Check out the live version of MantraOS here: **[Live Demo Link Coming Soon]**
 | Onboarding | Dashboard |
 | :---: | :---: |
 | ![Onboarding Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Onboarding) | ![Dashboard Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Dashboard) |
-| *Seamless setup to personalize your experience.* | *Your daily mantra with quick-glance stats.* |
+| *Seamless setup to personalize your experience.* | *Your daily mantra with voice controls and stats.* |
 
 | Library | Progress |
 | :---: | :---: |
 | ![Library Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Library) | ![Progress Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Progress) |
-| *Discover new mantras and manage your collection.* | *Track your consistency and unlock achievements.* |
+| *Manage your collection and record your voice.* | *Track your consistency and unlock achievements.* |
 
 | Settings |
 | :---: |
 | ![Settings Screen](https://via.placeholder.com/400x800.png/667eea/FFFFFF?text=Settings) |
-| *Customize themes, fonts, and notifications.* |
+| *Customize themes, sounds, and advanced features.* |
 
 
 ## ✨ Key Features
@@ -78,41 +80,50 @@ Check out the live version of MantraOS here: **[Live Demo Link Coming Soon]**
 - **Daily Mantra View:** A clean, focused interface to view your daily mantra.
 - **Intuitive Navigation:** Swipe left or right to effortlessly navigate between your selected mantras.
 - **At-a-Glance Stats:** Key metrics like Total Views, Current Streak, and Views Today are displayed prominently.
-- **Daily Affirmation:** Displays a user-added affirmation for an extra boost of positivity.
+- **Automatic Slideshow:** Enable an automatic slideshow to cycle through your mantras, with customizable timing. It intelligently pauses when you interact with the app.
+- **Ambient Animations:** A subtle floating effect on the mantra text and a gently shifting background gradient create a calming, immersive atmosphere.
+
+### 🎤 Voice Personalization
+- **Record Your Voice:** Bring your mantras to life by recording your own voice reading them aloud (up to 30 seconds per mantra).
+- **Full Playback Control:** Play, pause, stop, re-record, and delete your voice memos with an intuitive interface.
+- **Visual Feedback:** A pulsing animation and a clear countdown timer make the recording process engaging and easy to follow.
+- **Storage Optimized:** Audio is compressed to save space, and you can monitor usage in the settings.
+
+### 🎉 Motivational Feedback
+- **Celebrations:** Experience a burst of confetti and satisfying sound effects upon completing your daily goal or hitting a 7-day streak.
+- **Haptic Feedback:** Feel subtle vibrations on key interactions like button presses and swipes for a more tactile experience (can be toggled in settings).
 
 ### 📚 Library
 - **Discover Mantras:** Explore a rich library of pre-written mantras organized by categories like Money, Health, Relationships, Career, and Confidence.
-- **Search & Filter:** Easily find mantras within categories using a search bar.
 - **Manage Your Mantras:** View all your added mantras, remove ones that no longer serve you, assign a priority level (Low, Medium, High), and sort them to your liking.
-- **Manage Your Affirmations:** A dedicated section to add, view, and remove your personal daily affirmations.
+- **Integrated Voice Controls:** Record, play, and manage voice memos for each of your mantras directly within the library.
 
 ### 📊 Progress Tracking
 - **Detailed Statistics:** A dedicated progress screen shows your Total Views, Current Streak, and your all-time Longest Streak.
-- **Top Mantra:** See which mantra you engage with the most.
 - **Achievements:** Unlock badges for milestones like viewing your first mantra, maintaining a 7-day streak, or creating a custom mantra.
 - **Interactive Calendar:** A visual calendar highlights the days you were active, providing a clear picture of your consistency.
 
 ### ⚙️ Settings & Personalization
-- **Theme Customization:** Choose from multiple beautiful color gradients to match your mood.
-- **Font Selection:** Switch between a modern sans-serif font (Poppins) and an elegant serif font (Playfair Display).
+- **Theme & Font Customization:** Choose from multiple beautiful color gradients and two distinct font styles (modern or elegant).
 - **Dark Mode:** A sleek dark mode for comfortable viewing in low-light conditions.
-- **Smart Notifications:** Configure reminders for your mantras (morning, afternoon, evening) and a separate reminder for your daily affirmation.
-- **PWA Installation:** Install MantraOS to your home screen for a fast, native-app-like experience.
+- **Feature Toggles:** Easily enable or disable features like the Slideshow, Voice Recordings, Celebration Sounds, and Haptic Feedback.
+- **Undo/Redo System:** Never worry about mistakes again. Easily undo or redo recent actions like adding/deleting mantras or changing settings, complete with toast notifications and keyboard shortcuts (`Ctrl+Z` / `Ctrl+Y`).
 - **Data Management:** Securely export all your data to a JSON file for backup and import it on any device.
-- **Application Reset:** A simple option to reset all application data and start fresh.
+- **Storage Management:** Monitor the storage space used by voice recordings and an option to delete all recordings at once.
 
 ## 🤔 How It Works
 
 MantraOS is designed for simplicity and performance. The entire application is a **single, self-contained `index.html` file**.
 
-- **State Management:** A global JavaScript `state` object holds all user data, including mantras, settings, and progress.
-- **Local Persistence:** The `localStorage` API is used to save the entire application state. This ensures that all your data is stored securely on your device and is available even when you're offline.
-- **Client-Side Logic:** There is no backend server. All logic, from rendering views to tracking progress, is handled directly in the user's browser, making it fast and private.
-- **Dynamic Rendering:** The UI is dynamically rendered using vanilla JavaScript functions that generate HTML strings and mount them to the DOM. This approach avoids the need for heavy frameworks.
+- **State Management:** A global JavaScript `state` object holds all user data. An undo/redo history is maintained to allow for easy state transitions.
+- **Local Persistence:** The `localStorage` API is used to save the entire application state. This ensures that all your data, including compressed audio recordings, is stored securely on your device and is available offline.
+- **Client-Side Logic:** There is no backend server. All logic, from rendering views to audio processing, is handled directly in the user's browser, making it fast and private.
+- **Dynamic Rendering:** The UI is dynamically rendered using vanilla JavaScript functions that generate HTML strings and mount them to the DOM.
 
 ## 🛠️ Technology Stack
 
 - **Frontend:** Vanilla JavaScript (ES6+), HTML5, CSS3
+- **Web APIs:** `localStorage`, `MediaRecorder API`, `Web Audio API`, `Vibration API`
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) (via CDN) for rapid, utility-first styling.
 - **Icons:** [Lucide Icons](https://lucide.dev/) embedded as SVG functions.
 - **Deployment:** Can be hosted on any static web hosting service (like Vercel, Netlify, or GitHub Pages).
@@ -132,7 +143,7 @@ Since this is a vanilla web application, there is no complex build process.
     ```
 
 3.  **Run locally:**
-    You can open the `index.html` file directly in your browser. However, for the best experience and to enable Progressive Web App (PWA) features like the "Install App" button, you must serve the files from a local web server. This is because modern browser security policies restrict PWA features to `http` or `https` protocols, not the `file://` protocol used when opening files directly.
+    You can open the `index.html` file directly in your browser. However, for the best experience and to enable features like voice recording (which requires a secure context) and PWA installation, you must serve the files from a local web server.
 
     Here are a few ways to start a local server:
 
@@ -147,27 +158,17 @@ Since this is a vanilla web application, there is no complex build process.
         ```bash
         serve .
         ```
-    
-    An alternative to `serve` is `live-server`, which automatically reloads the page when you make changes.
-    1.  **Install `live-server` globally:** `npm install -g live-server`
-    2.  **Run it:** `live-server`
 
     #### Using Python
     If you have Python installed, you can use its built-in web server.
 
-    -   For Python 3:
-        ```bash
-        python -m http.server
-        ```
-    -   For Python 2:
-        ```bash
-        python -m SimpleHTTPServer
-        ```
+    -   For Python 3: `python -m http.server`
+    -   For Python 2: `python -m SimpleHTTPServer`
 
     #### Using VS Code
-    If you use Visual Studio Code, a popular and easy-to-use option is the [Live Server extension](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer). Once installed, you can right-click the `index.html` file and select "Open with Live Server".
+    If you use Visual Studio Code, a popular option is the [Live Server extension](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer). Once installed, right-click the `index.html` file and select "Open with Live Server".
 
-    After starting the server with any of these methods, open the provided URL (e.g., `http://localhost:3000`, `http://localhost:8000`) in your browser to use the application.
+    After starting the server, open the provided URL (e.g., `http://localhost:3000`) in your browser.
 
 ## 🤝 Contributing
 
@@ -186,10 +187,10 @@ If you have a suggestion that would make this better, please fork the repo and c
 Here are some of the features planned for the future:
 
 - [ ] **Custom Categories:** Allow users to create and manage their own mantra categories.
-- [ ] **Text-to-Speech:** An option to listen to your mantras.
-- [ ] **More Achievements:** Add new badges and milestones to keep users engaged.
+- [ ] **Text-to-Speech:** An option to listen to your mantras using a synthesized voice.
 - [ ] **Journaling:** A space to write down thoughts and reflections related to your daily mantra.
-- [ ] **Data Sync:** Optional cloud sync to keep data consistent across devices (privacy-focused).
+- [ ] **More Themes & Sounds:** Expand the library of customization options.
+- [ ] **Data Sync:** Optional, privacy-focused cloud sync to keep data consistent across devices.
 
 See the [open issues](https://github.com/your-username/mantra-os/issues) for a full list of proposed features (and known issues).
 

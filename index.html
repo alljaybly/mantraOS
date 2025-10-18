@@ -36,6 +36,13 @@
           animation: {
             'fade-in': 'fadeIn 0.5s ease-in-out',
             'slide-in-up': 'slideInUp 0.5s ease-in-out',
+            'toast-in': 'toastIn 0.3s ease-out forwards',
+            'toast-out': 'toastOut 0.3s ease-in forwards',
+            'confetti-fall': 'confettiFall 3s ease-out forwards',
+            'slideshow-progress': 'slideshowProgress linear forwards',
+            'float': 'float 8s ease-in-out infinite',
+            'gradient-shift': 'gradientShift 20s ease infinite',
+            'pulse-ring': 'pulseRing 2s ease-out infinite',
           },
           keyframes: {
             fadeIn: {
@@ -45,7 +52,35 @@
             slideInUp: {
               '0%': { transform: 'translateY(20px)', opacity: '0' },
               '100%': { transform: 'translateY(0)', opacity: '1' },
-            }
+            },
+            toastIn: {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+            toastOut: {
+                '0%': { transform: 'translateY(0)', opacity: '1' },
+                '100%': { transform: 'translateY(100%)', opacity: '0' },
+            },
+            pulseRing: {
+                '0%': { transform: 'scale(0.8)', opacity: '1' },
+                '100%': { transform: 'scale(2.5)', opacity: '0' }
+            },
+            confettiFall: {
+                '0%': { transform: 'translateY(-10vh) rotateZ(0deg)', opacity: 1 },
+                '100%': { transform: 'translateY(110vh) rotateZ(360deg)', opacity: 0 },
+            },
+            slideshowProgress: {
+                '0%': { width: '0%' },
+                '100%': { width: '100%' },
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(-5px)' },
+              '50%': { transform: 'translateY(5px)' },
+            },
+            gradientShift: {
+              '0%, 100%': { backgroundPosition: '0% 50%' },
+              '50%': { backgroundPosition: '100% 50%' },
+            },
           }
         }
       }
@@ -102,11 +137,21 @@
     .bar-chart-bar {
         transition: height 0.3s ease-out;
     }
+
+    /* Confetti styles */
+    .confetti-piece {
+        position: absolute;
+        width: 8px;
+        height: 16px;
+        top: -20px;
+        will-change: transform, opacity;
+    }
   </style>
 
 </head>
 <body class="antialiased">
   <div id="root"></div>
+  <div id="toast-container" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[120] w-full max-w-sm px-4"></div>
 
   <script type="module">
     // --- ICONS (Lucide via esm.sh as self-contained functions) ---
@@ -137,7 +182,7 @@
         Home: createIcon('Home', '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>'),
         Library: createIcon('Library', '<path d="m16 6 4 14"></path><path d="M12 6v14"></path><path d="M8 8v12"></path><path d="M4 4v16"></path>'),
         BarChart2: createIcon('BarChart2', '<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>'),
-        Settings: createIcon('Settings', '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0 2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>'),
+        Settings: createIcon('Settings', '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0 2l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>'),
         Plus: createIcon('Plus', '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>'),
         Trash2: createIcon('Trash2', '<polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line>'),
         Award: createIcon('Award', '<circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>'),
@@ -148,6 +193,17 @@
         Search: createIcon('Search', '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'),
         Download: createIcon('Download', '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
         Upload: createIcon('Upload', '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'),
+        Microphone: createIcon('Microphone', '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line>'),
+        MicOff: createIcon('MicOff', '<line x1="16" x2="16" y1="13" y2="22"></line><line x1="8" x2="8" y1="13" y2="17"></line><path d="M12 1v8"></path><path d="M20 10v2a8 8 0 0 1-16 0v-2"></path><line x1="1" x2="23" y1="1" y2="23"></line>'),
+        Play: createIcon('Play', '<polygon points="5 3 19 12 5 21 5 3"></polygon>'),
+        Pause: createIcon('Pause', '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>'),
+        StopCircle: createIcon('StopCircle', '<circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect>'),
+        Trophy: createIcon('Trophy', '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>'),
+        Music4: createIcon('Music4', '<path d="M9 18V5l12-2v13"/><path d="m9 9 12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+        Timer: createIcon('Timer', '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>'),
+        Vibrate: createIcon('Vibrate', '<path d="m2 8 2.18-1.37a2 2 0 0 1 2.64 0L10 8"/><path d="m14 8 2.18-1.37a2 2 0 0 1 2.64 0L22 8"/><path d="M7 13h10"/><path d="M9 17h6"/><path d="M2 12H0"/><path d="M24 12h-2"/><path d="m5 21 2-4"/><path d="m19 21-2-4"/><path d="M19 5l-2 4"/><path d="m5 5 2 4"/>'),
+        RotateCcw: createIcon('RotateCcw', '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'),
+        RotateCw: createIcon('RotateCw', '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'),
     };
 
     // --- CONSTANTS ---
@@ -168,11 +224,29 @@
     const INITIAL_ACHIEVEMENTS = [
         { id: 'first_view', title: 'First Step', description: 'View your first mantra.', unlocked: false }, { id: '7_day_streak', title: 'Consistent Mind', description: 'View mantras for 7 days in a row.', unlocked: false }, { id: '3_mantras', title: 'Trio of Power', description: 'Select at least 3 mantras.', unlocked: false }, { id: 'custom_mantra', title: 'Your Own Voice', description: 'Create your first custom mantra.', unlocked: false }, { id: '100_views', title: 'Mantra Master', description: 'View mantras 100 times in total.', unlocked: false },
     ];
+    const MAX_RECORDING_SECONDS = 30;
+
+    // --- AUDIO & BROWSER SUPPORT ---
+    const isAudioSupported = !!(navigator.mediaDevices && window.MediaRecorder);
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingTimer = null;
+    let recordingInterval = null;
+    let currentlyRecordingMantraId = null;
+    const audioPlayer = new Audio();
+    let currentlyPlayingMantraId = null;
+    let audioContext;
+
 
     // --- STATE MANAGEMENT ---
     let deferredInstallPrompt = null;
     let calendarViewDate = new Date(); // For stateful calendar navigation
     let myMantrasSortOrder = 'date-desc'; // For sorting 'My Mantras' view
+    let slideshowTimer = null;
+    let undoHistory = [];
+    let redoHistory = [];
+    let toastTimeout = null;
+
 
     const defaultSettings = {
         theme: 'theme-gradient-1', font: 'font-sans', isDarkMode: false,
@@ -185,6 +259,10 @@
             },
             affirmation: { enabled: false, time: '09:00' }
         },
+        voiceFeatures: { enabled: true },
+        celebrationSounds: { enabled: true },
+        haptics: { enabled: true },
+        slideshow: { enabled: false, interval: 7 } // interval in seconds
     };
 
     let state = {
@@ -197,6 +275,9 @@
       currentMantraIndex: 0,
       onboardingTempMantras: [],
       dailyAffirmation: null,
+      audioRecordings: {},
+      lastDailyGoalCelebrated: null, // YYYY-MM-DD
+      lastStreakMilestoneCelebrated: 0, // e.g., 7, 14, 21
     };
 
     const storageKeys = {
@@ -208,6 +289,9 @@
         achievements: 'mantraos_achievements',
         dailyAffirmation: 'mantraos_daily_affirmation',
         onboardingTempMantras: 'mantraos_onboarding_temp_mantras',
+        audioRecordings: 'mantraos_audio_recordings',
+        lastDailyGoal: 'mantraos_last_daily_goal',
+        lastStreakMilestone: 'mantraos_last_streak_milestone',
     };
 
     function saveState() {
@@ -220,8 +304,14 @@
             localStorage.setItem(storageKeys.achievements, JSON.stringify(state.achievements));
             localStorage.setItem(storageKeys.dailyAffirmation, JSON.stringify(state.dailyAffirmation));
             localStorage.setItem(storageKeys.onboardingTempMantras, JSON.stringify(state.onboardingTempMantras));
+            localStorage.setItem(storageKeys.audioRecordings, JSON.stringify(state.audioRecordings));
+            localStorage.setItem(storageKeys.lastDailyGoal, JSON.stringify(state.lastDailyGoalCelebrated));
+            localStorage.setItem(storageKeys.lastStreakMilestone, JSON.stringify(state.lastStreakMilestoneCelebrated));
         } catch (error) {
             console.error("Failed to save state to localStorage:", error);
+            if (error.name === 'QuotaExceededError') {
+                 renderModal('Storage Full', 'Your device storage is full. Please clear some space, or delete some voice recordings from the settings menu.');
+            }
         }
     }
 
@@ -280,6 +370,9 @@
             state.achievements = JSON.parse(localStorage.getItem(storageKeys.achievements)) || INITIAL_ACHIEVEMENTS;
             state.dailyAffirmation = JSON.parse(localStorage.getItem(storageKeys.dailyAffirmation)) || null;
             state.onboardingTempMantras = JSON.parse(localStorage.getItem(storageKeys.onboardingTempMantras)) || [];
+            state.audioRecordings = JSON.parse(localStorage.getItem(storageKeys.audioRecordings)) || {};
+            state.lastDailyGoalCelebrated = JSON.parse(localStorage.getItem(storageKeys.lastDailyGoal)) || null;
+            state.lastStreakMilestoneCelebrated = JSON.parse(localStorage.getItem(storageKeys.lastStreakMilestone)) || 0;
             
         } catch (error) {
             console.error("Failed to load state from localStorage:", error);
@@ -288,42 +381,39 @@
 
     // --- DOM & UTILS ---
     const root = document.getElementById('root');
-    const hapticFeedback = () => navigator.vibrate && navigator.vibrate(50);
-
-    // --- APP LOGIC ---
-    const addMantra = (mantra) => {
-        if (!state.userMantras.find(m => m.id === mantra.id)) {
-            // Ensure every added mantra has a creation timestamp.
-            const mantraToAdd = { ...mantra, createdAt: mantra.createdAt || Date.now() };
-            state.userMantras.push(mantraToAdd);
-            saveState();
+    const hapticFeedback = () => {
+        if (state.settings.haptics.enabled && navigator.vibrate) {
+            navigator.vibrate(50);
         }
     };
-    const removeMantra = (mantraId) => {
-        state.userMantras = state.userMantras.filter(m => m.id !== mantraId);
-        saveState();
+    const getAudioStorageUsage = () => {
+        const data = localStorage.getItem(storageKeys.audioRecordings) || '{}';
+        const bytes = new Blob([data]).size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
-    const addAffirmation = (text) => {
-        const newAffirmation = { id: `affirm-${Date.now()}`, text };
-        state.userAffirmations.push(newAffirmation);
-        saveState();
+    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const getNestedValue = (obj, path) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
+    const setNestedValue = (obj, path, value) => {
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        const target = keys.reduce((acc, part) => acc[part] = acc[part] || {}, obj);
+        target[lastKey] = value;
     };
-    const removeAffirmation = (affirmationId) => {
-        state.userAffirmations = state.userAffirmations.filter(a => a.id !== affirmationId);
-        saveState();
-    };
+
+
+    // --- APP LOGIC ---
     const unlockAchievement = (id) => {
         const achievement = state.achievements.find(a => a.id === id);
         if (achievement && !achievement.unlocked) {
             achievement.unlocked = true;
             saveState();
-            // Optionally show a notification
         }
     };
     const recordMantraView = (mantraId) => {
         if (!mantraId) return;
-        const d = new Date();
-        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const today = formatDate(new Date());
 
         if (!state.progress[mantraId]) {
             state.progress[mantraId] = { views: 0, lastViewed: '' };
@@ -335,6 +425,7 @@
         if (totalViews >= 100) unlockAchievement('100_views');
         if (getStreak() >= 7) unlockAchievement('7_day_streak');
         saveState();
+        checkForCelebrations();
     };
     const getTotalViews = () => Object.values(state.progress).reduce((total, p) => total + p.views, 0);
     const getStreak = () => {
@@ -345,8 +436,6 @@
         const today = new Date();
         const yesterday = new Date();
         yesterday.setDate(today.getDate() - 1);
-
-        const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         
         const todayStr = formatDate(today);
         const yesterdayStr = formatDate(yesterday);
@@ -399,21 +488,13 @@
     };
     const applySettings = () => {
         document.body.className = '';
-        document.body.classList.add(state.settings.theme, 'antialiased', 'text-white', 'transition-colors', 'duration-500');
+        document.body.classList.add(state.settings.theme, 'antialiased', 'text-white', 'transition-colors', 'duration-500', 'bg-[length:200%_200%]', 'animate-gradient-shift');
         document.documentElement.classList.toggle('dark', state.settings.isDarkMode);
         document.documentElement.style.setProperty('--font-family', state.settings.font === 'font-sans' ? "'Poppins', sans-serif" : "'Playfair Display', serif");
     };
     const exportUserData = () => {
         try {
-            const backupData = {
-                userMantras: state.userMantras,
-                userAffirmations: state.userAffirmations,
-                settings: state.settings,
-                progress: state.progress,
-                isOnboardingComplete: state.isOnboardingComplete,
-                achievements: state.achievements,
-                dailyAffirmation: state.dailyAffirmation,
-            };
+            const backupData = { ...state };
             const jsonString = JSON.stringify(backupData, null, 2);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -430,6 +511,199 @@
             console.error('Failed to export data:', error);
             alert('An error occurred while exporting your data.');
         }
+    };
+    
+    // --- SLIDESHOW LOGIC ---
+    const stopSlideshow = () => {
+        clearTimeout(slideshowTimer);
+        slideshowTimer = null;
+    };
+
+    const goToNextMantra = () => {
+        const newIndex = (state.currentMantraIndex + 1) % state.userMantras.length;
+        state.currentMantraIndex = newIndex;
+
+        const mantraText = document.getElementById('mantra-text');
+        if (mantraText) {
+            mantraText.style.opacity = '0';
+            setTimeout(() => {
+                renderDashboard();
+            }, 150);
+        } else {
+            renderDashboard();
+        }
+    };
+
+    const startSlideshow = () => {
+        stopSlideshow(); // Ensure no multiple timers are running
+        if (state.settings.slideshow.enabled && state.userMantras.length > 1) {
+            slideshowTimer = setTimeout(goToNextMantra, state.settings.slideshow.interval * 1000);
+        }
+    };
+
+    const resetSlideshowTimer = () => {
+        stopSlideshow();
+        startSlideshow();
+    };
+
+    // --- AUDIO LOGIC ---
+    const playSound = (type) => {
+        if (!state.settings.celebrationSounds.enabled) return;
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const playNote = (freq, startTime, duration) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = freq;
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, startTime + duration);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+            };
+
+            const now = audioContext.currentTime;
+            if (type === 'daily') {
+                playNote(880, now, 0.2); // A5 note
+            } else if (type === 'streak') {
+                playNote(523.25, now, 0.15); // C5
+                playNote(659.25, now + 0.15, 0.15); // E5
+                playNote(783.99, now + 0.3, 0.2); // G5
+            }
+        } catch (e) {
+            console.error("Could not play sound:", e);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+        }
+        clearTimeout(recordingTimer);
+        clearInterval(recordingInterval);
+        recordingTimer = null;
+        recordingInterval = null;
+        startSlideshow(); // Resume slideshow after stopping recording
+    };
+    
+    const startRecording = async (mantraId) => {
+        if (currentlyRecordingMantraId) stopRecording();
+        if (!audioPlayer.paused) stopPlayback();
+        stopSlideshow();
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            currentlyRecordingMantraId = mantraId;
+            audioChunks = [];
+            
+            // Re-render to show recording UI
+            const currentPath = window.location.hash.slice(1);
+            if(currentPath === '/dashboard') renderDashboard();
+            else if(currentPath === '/library') renderLibraryContent('my-mantras');
+
+            const options = {
+                mimeType: 'audio/webm;codecs=opus',
+                audioBitsPerSecond: 64000 // 64kbps, a good balance for voice
+            };
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                console.warn("Opus codec or specific bitrate not supported, falling back to default.", e);
+                mediaRecorder = new MediaRecorder(stream); 
+            }
+            
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: options.mimeType });
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const oldRecording = state.audioRecordings[mantraId];
+                    performAction({
+                        type: 'SET_RECORDING',
+                        payload: { mantraId, oldRecording, newRecording: reader.result }
+                    });
+                    currentlyRecordingMantraId = null;
+                };
+                reader.readAsDataURL(audioBlob);
+                stream.getTracks().forEach(track => track.stop()); // Release microphone
+            };
+
+            mediaRecorder.start();
+
+            // Auto-stop after max duration
+            recordingTimer = setTimeout(stopRecording, MAX_RECORDING_SECONDS * 1000);
+            
+            // Timer UI update
+            let secondsRemaining = MAX_RECORDING_SECONDS;
+            const timerEl = document.getElementById(`audio-timer-${mantraId}`);
+            if (timerEl) timerEl.textContent = `${secondsRemaining}s left`;
+
+            recordingInterval = setInterval(() => {
+                secondsRemaining--;
+                const timerEl = document.getElementById(`audio-timer-${mantraId}`);
+                if (timerEl) {
+                    timerEl.textContent = `${secondsRemaining}s left`;
+                }
+                if (secondsRemaining <= 0) {
+                    clearInterval(recordingInterval);
+                }
+            }, 1000);
+
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            currentlyRecordingMantraId = null;
+            renderModal('Microphone Error', 'Could not access the microphone. Please ensure you have granted permission in your browser settings.');
+        }
+    };
+
+    const stopPlayback = () => {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        const oldPlayingId = currentlyPlayingMantraId;
+        currentlyPlayingMantraId = null;
+
+        const controls = document.getElementById(`audio-controls-${oldPlayingId}`);
+        if(controls) controls.innerHTML = renderAudioInterface(oldPlayingId);
+        startSlideshow(); // Resume slideshow
+    };
+
+    const playRecording = (mantraId) => {
+        stopSlideshow();
+        if (currentlyRecordingMantraId) stopRecording();
+        if (currentlyPlayingMantraId && currentlyPlayingMantraId !== mantraId) stopPlayback();
+
+        currentlyPlayingMantraId = mantraId;
+        
+        if (audioPlayer.src !== state.audioRecordings[mantraId]) {
+            audioPlayer.src = state.audioRecordings[mantraId];
+        }
+        audioPlayer.play();
+    };
+
+    const pauseRecording = () => {
+        audioPlayer.pause();
+        stopSlideshow(); // Also pause slideshow
+    };
+
+    const deleteRecording = (mantraId) => {
+        renderConfirmationModal('Delete Recording?', 'This will permanently remove the voice recording for this mantra.', () => {
+            if(currentlyPlayingMantraId === mantraId) stopPlayback();
+            performAction({
+                type: 'DELETE_RECORDING',
+                payload: { mantraId, recording: state.audioRecordings[mantraId] }
+            });
+        }, {confirmText: 'Delete', confirmVariant: 'destructive'});
     };
 
 
@@ -507,20 +781,205 @@
         modalElement.addEventListener('click', (e) => { if(e.target === modalElement) closeModal(); });
     };
 
-    const renderPage = (content, { showBackButton = false } = {}) => {
-        const isAppView = !window.location.hash.includes('onboarding');
-        const backButtonHtml = showBackButton ? `
-            <div class="mb-4">
-                <button data-action="go-back" class="inline-flex items-center gap-2 p-2 pr-4 rounded-full bg-white/10 hover:bg-white/20 transition-colors" aria-label="Go back">
-                    ${ICONS.ArrowLeft({ size: 20 })}
-                    <span class="text-sm">Back</span>
+    const renderToast = (message, hasUndo = false) => {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        
+        clearTimeout(toastTimeout);
+        container.innerHTML = ''; // Clear previous toast
+
+        const toast = document.createElement('div');
+        toast.className = 'glass-card flex items-center justify-between p-3 rounded-xl shadow-lg animate-toast-in';
+        
+        const undoButton = hasUndo ? `<button data-action="undo" class="font-bold text-teal ml-4">Undo</button>` : '';
+        toast.innerHTML = `<span>${message}</span> ${undoButton}`;
+        
+        container.appendChild(toast);
+
+        const removeToast = () => {
+            toast.classList.remove('animate-toast-in');
+            toast.classList.add('animate-toast-out');
+            toast.addEventListener('animationend', () => toast.remove());
+        };
+
+        toastTimeout = setTimeout(removeToast, 4000);
+    };
+
+    // --- CELEBRATION LOGIC ---
+    const renderCelebrationModal = (title, description, icon) => {
+        const modalId = 'celebration-modal';
+        document.getElementById(modalId)?.remove();
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 animate-fade-in overflow-hidden">
+                <div id="confetti-container" class="absolute inset-0 pointer-events-none"></div>
+                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up relative">
+                    <div class="text-gold mb-4">${icon}</div>
+                    <h2 class="text-3xl font-serif mb-3">${title}</h2>
+                    <p class="text-white/80 mb-6">${description}</p>
+                    ${renderButton('Awesome!', { attributes: `data-action="close-celebration-modal"` })}
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        const modal = document.getElementById(modalId);
+        modal.querySelector('[data-action="close-celebration-modal"]').addEventListener('click', () => modal.remove());
+
+        // Create and animate confetti
+        const container = document.getElementById('confetti-container');
+        const colors = ['#f6d365', '#4facfe', '#764ba2', '#ffffff'];
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti-piece';
+            confetti.style.left = `${Math.random() * 100}vw`;
+            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.animation = `confetti-fall ${2 + Math.random() * 2}s ${Math.random() * 2}s ease-out forwards`;
+            confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+            container.appendChild(confetti);
+        }
+    };
+
+    const triggerCelebration = (type, value) => {
+        playSound(type);
+        if (type === 'daily') {
+            renderCelebrationModal(
+                'Daily Goal Achieved!',
+                "You've reviewed all your mantras for today. Incredible focus!",
+                ICONS.CheckCircle({ size: 64, className: 'mx-auto' })
+            );
+            state.lastDailyGoalCelebrated = formatDate(new Date());
+        } else if (type === 'streak') {
+            renderCelebrationModal(
+                `${value}-Day Streak!`,
+                "Your consistency is building powerful momentum. Keep it up!",
+                ICONS.Trophy({ size: 64, className: 'mx-auto' })
+            );
+            state.lastStreakMilestoneCelebrated = value;
+        }
+        saveState();
+    };
+
+    const checkForCelebrations = () => {
+        const today = formatDate(new Date());
+
+        // Check for daily goal completion
+        if (state.lastDailyGoalCelebrated !== today && state.userMantras.length > 0) {
+            const allMantrasViewedToday = state.userMantras.every(mantra => {
+                return state.progress[mantra.id] && state.progress[mantra.id].lastViewed === today;
+            });
+            if (allMantrasViewedToday) {
+                triggerCelebration('daily');
+            }
+        }
+        
+        // Check for streak milestone
+        const streak = getStreak();
+        if (streak > 0 && streak % 7 === 0 && streak !== state.lastStreakMilestoneCelebrated) {
+            triggerCelebration('streak', streak);
+        }
+    };
+    
+    const renderAudioInterface = (mantraId) => {
+        if (!isAudioSupported) {
+            return `
+                <div class="flex items-center gap-2 text-sm text-white/60" title="Your browser does not support the MediaRecorder API required for voice recording.">
+                    ${ICONS.MicOff({size: 20})}
+                    <span class="italic">Recording not supported</span>
+                </div>
+            `;
+        }
+
+        if (!state.settings.voiceFeatures.enabled) return '';
+    
+        const hasRecording = !!state.audioRecordings[mantraId];
+        const isRecordingThis = currentlyRecordingMantraId === mantraId;
+        const isPlayingThis = currentlyPlayingMantraId === mantraId && !audioPlayer.paused;
+        const isPausedThis = currentlyPlayingMantraId === mantraId && audioPlayer.paused && audioPlayer.currentTime > 0;
+
+        if (isRecordingThis) {
+            return `
+                <div class="flex flex-col items-center gap-3 w-full max-w-xs">
+                    <div class="relative flex items-center justify-center w-20 h-20">
+                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
+                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
+                        <button data-action="stop-recording" data-mantra-id="${mantraId}" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg">
+                            ${ICONS.StopCircle({size: 24})}
+                        </button>
+                    </div>
+                    <div id="audio-timer-${mantraId}" class="text-lg font-mono text-white/80 font-semibold">${MAX_RECORDING_SECONDS}s left</div>
+                </div>
+            `;
+        }
+    
+        if (hasRecording) {
+            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
+            let playbackControls = '';
+            
+            const playButton = `<button data-action="play-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full">${ICONS.Play({size: 20})}</button>`;
+            const pauseButton = `<button data-action="pause-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full">${ICONS.Pause({size: 20})}</button>`;
+            const stopButton = `<button data-action="stop-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full">${ICONS.StopCircle({size: 20})}</button>`;
+
+            if (isPlayingThis) {
+                playbackControls = `${pauseButton}${stopButton}`;
+            } else if (isPausedThis) {
+                playbackControls = `${playButton}${stopButton}`;
+            } else { // Stopped state
+                playbackControls = playButton;
+            }
+
+            return `
+                <div class="flex items-center gap-2 w-full max-w-xs">
+                    ${playbackControls}
+                    <div class="h-1.5 bg-white/20 rounded-full overflow-hidden flex-grow">
+                        <div class="h-full bg-teal audio-progress-bar-inner" data-mantra-id="${mantraId}" style="width: ${isPausedThis || isPlayingThis ? progress : 0}%;"></div>
+                    </div>
+                    <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Re-record voice memo">${ICONS.Microphone({size: 20})}</button>
+                    <button data-action="delete-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Delete voice memo">${ICONS.Trash2({size: 20})}</button>
+                </div>
+            `;
+        }
+    
+        return `
+            <div class="flex items-center gap-2">
+                <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full">${ICONS.Microphone({size: 20})}</button>
+                <span class="text-sm text-white/60">Add Your Voice</span>
+            </div>
+        `;
+    };
+
+    const renderUndoRedoControls = () => {
+        const canUndo = undoHistory.length > 0;
+        const canRedo = redoHistory.length > 0;
+        return `
+            <div class="flex gap-2">
+                <button data-action="undo" class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Undo" ${!canUndo ? 'disabled' : ''}>
+                    ${ICONS.RotateCcw({ size: 20 })}
+                </button>
+                <button data-action="redo" class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Redo" ${!canRedo ? 'disabled' : ''}>
+                    ${ICONS.RotateCw({ size: 20 })}
                 </button>
             </div>
+        `;
+    };
+
+    const renderPage = (content, { showBackButton = false, showUndoRedo = false } = {}) => {
+        const isAppView = !window.location.hash.includes('onboarding');
+        const headerContent = (showBackButton || showUndoRedo) ? `
+            <header class="flex justify-between items-center mb-4">
+                ${showBackButton ? `
+                    <button data-action="go-back" class="inline-flex items-center gap-2 p-2 pr-4 rounded-full bg-white/10 hover:bg-white/20 transition-colors" aria-label="Go back">
+                        ${ICONS.ArrowLeft({ size: 20 })}
+                        <span class="text-sm">Back</span>
+                    </button>
+                ` : '<div></div>'}
+                ${showUndoRedo ? renderUndoRedoControls() : ''}
+            </header>
         ` : '';
 
         const mainAppLayout = `
             <div class="relative min-h-screen ${isAppView ? 'pb-24' : ''}">
-                <main class="p-4 md:p-6">${backButtonHtml}${content}</main>
+                <main class="p-4 md:p-6">${headerContent}${content}</main>
                 ${isAppView ? renderBottomNav() : ''}
             </div>
         `;
@@ -569,7 +1028,8 @@
                     feedbackText = `Please select ${remaining} more mantra${remaining > 1 ? 's' : ''}.`;
                     feedbackColorClass = 'text-yellow-300';
                 } else if (selectionCount >= 3 && selectionCount < 5) {
-                    feedbackText = `Great! You can select up to ${5 - selectionCount} more or continue.`;
+                    const remaining = 5 - selectionCount;
+                    feedbackText = `Great! You can select up to ${remaining} more or continue.`;
                     feedbackColorClass = 'text-teal-300';
                 } else if (selectionCount === 5) {
                     feedbackText = `Maximum selected. You're ready to proceed!`;
@@ -745,6 +1205,12 @@
             const streak = getStreak();
             const streakIcon = streak > 0 ? ICONS.Zap({ size: 16, className: 'inline-block text-gold -mt-1 mr-1' }) : '';
             const priorityColor = PRIORITIES[currentMantra?.priority] || PRIORITIES['Medium'];
+
+            const slideshowProgressBar = state.settings.slideshow.enabled && state.userMantras.length > 1 ? `
+                <div class="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-2">
+                    <div class="h-full bg-teal" style="animation: slideshow-progress ${state.settings.slideshow.interval}s linear forwards;"></div>
+                </div>
+            ` : '';
             
             content = `
                 <div class="flex flex-col h-[calc(100vh-8rem)] justify-between">
@@ -757,9 +1223,12 @@
                   ${dailyAffirmationHtml}
 
                   <div id="swipe-area" class="flex-grow flex items-center justify-center relative overflow-hidden">
-                    <p id="mantra-text" class="text-4xl md:text-6xl font-serif text-center leading-tight animate-fade-in">"${currentMantra?.text}"</p>
+                    <p id="mantra-text" class="text-4xl md:text-6xl font-serif text-center leading-tight animate-fade-in animate-float">"${currentMantra?.text}"</p>
                   </div>
                   <div class="text-center animate-fade-in">
+                    <div id="audio-controls-${currentMantra?.id}" class="flex justify-center mb-4">
+                        ${renderAudioInterface(currentMantra?.id)}
+                    </div>
                     <p class="bg-white/20 inline-flex items-center px-3 py-1 rounded-full text-sm mb-4">
                         <span class="w-2.5 h-2.5 ${priorityColor} rounded-full mr-2"></span>
                         ${currentMantra?.category}
@@ -767,12 +1236,14 @@
                     <div class="flex justify-center mt-4 space-x-2" id="dot-indicators">
                         ${state.userMantras.map((_, index) => `<button data-action="set-mantra-index" data-index="${index}" class="w-2 h-2 rounded-full transition-colors ${state.currentMantraIndex === index ? 'bg-white' : 'bg-white/30'}"></button>`).join('')}
                     </div>
+                    ${slideshowProgressBar}
                   </div>
                 </div>`;
         }
         renderPage(content);
         if (state.userMantras.length > 0) {
             setupSwipeListeners();
+            startSlideshow();
         }
     };
 
@@ -795,7 +1266,7 @@
                 </div>
             `;
         }
-        renderPage(content, { showBackButton: true });
+        renderPage(content, { showBackButton: true, showUndoRedo: true });
     };
 
     const renderLibrary = () => {
@@ -809,7 +1280,7 @@
                 </div>
                 <div id="library-content"></div>
             </div>`;
-        renderPage(content, { showBackButton: true });
+        renderPage(content, { showBackButton: true, showUndoRedo: true });
         renderLibraryContent('curated');
     };
     
@@ -900,15 +1371,20 @@
                                     ${ICONS.Trash2({ size: 16 })}
                                 </button>
                             </div>
-                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
-                                 <div class="flex items-center gap-2">
-                                    <span class="text-xs bg-white/10 px-2 py-0.5 rounded-full">${mantra.category}</span>
-                                    <span class="text-xs px-2 py-0.5 rounded-full ${priorityColor} font-semibold text-white">${mantra.priority}</span>
-                                 </div>
-                                <div class="flex items-center gap-2">
-                                    ${PRIORITY_LEVELS.map(p => `
-                                        <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : 'bg-white/20 hover:bg-white/30'}">${p}</button>
-                                    `).join('')}
+                            <div class="mt-3 pt-3 border-t border-white/10">
+                                <div id="audio-controls-${mantra.id}" class="mb-3">
+                                    ${renderAudioInterface(mantra.id)}
+                                </div>
+                                <div class="flex items-center justify-between">
+                                     <div class="flex items-center gap-2">
+                                        <span class="text-xs bg-white/10 px-2 py-0.5 rounded-full">${mantra.category}</span>
+                                        <span class="text-xs px-2 py-0.5 rounded-full ${priorityColor} font-semibold text-white">${mantra.priority}</span>
+                                     </div>
+                                    <div class="flex items-center gap-2">
+                                        ${PRIORITY_LEVELS.map(p => `
+                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : 'bg-white/20 hover:bg-white/30'}">${p}</button>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1027,7 +1503,6 @@
 
             const viewedDates = new Set(Object.values(state.progress).map(p => p.lastViewed));
             const today = new Date();
-            const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             const todayStr = formatDate(today);
 
             const date = new Date(year, month);
@@ -1140,6 +1615,57 @@
                     </button>
                 </div>
 
+                 <div class="glass-card p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Timer({size: 20})} Slideshow</h2>
+                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : 'bg-white/20'}">
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.slideshow.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                     ${s.slideshow.enabled ? `
+                    <div class="text-sm mt-3 pt-3 border-t border-white/20">
+                         <div class="flex justify-between items-center">
+                            <label for="slideshow-interval">Display each mantra for</label>
+                            <select id="slideshow-interval" data-action="set-slideshow-interval" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <option value="5" ${s.slideshow.interval === 5 ? 'selected' : ''}>5 seconds</option>
+                                <option value="7" ${s.slideshow.interval === 7 ? 'selected' : ''}>7 seconds</option>
+                                <option value="10" ${s.slideshow.interval === 10 ? 'selected' : ''}>10 seconds</option>
+                                <option value="15" ${s.slideshow.interval === 15 ? 'selected' : ''}>15 seconds</option>
+                                <option value="30" ${s.slideshow.interval === 30 ? 'selected' : ''}>30 seconds</option>
+                            </select>
+                        </div>
+                    </div>` : '<p class="text-sm text-white/70 mt-2">Enable to automatically cycle through your mantras on the dashboard.</p>'}
+                </div>
+
+                <div class="glass-card p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Microphone({size: 20})} Voice Features</h2>
+                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : 'bg-white/20'}" ${!isAudioSupported ? 'disabled' : ''}>
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.voiceFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                    ${!isAudioSupported ? '<p class="text-sm text-yellow-300 mt-2">Your browser does not support audio recording.</p>' : ''}
+                </div>
+                
+                <div class="glass-card p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Music4({size: 20})} Celebration Sounds</h2>
+                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : 'bg-white/20'}">
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.celebrationSounds.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Vibrate({size: 20})} Haptic Feedback</h2>
+                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : 'bg-white/20'}">
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.haptics.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                     <p class="text-sm text-white/70 mt-2">Enable subtle vibrations for actions like swiping and button presses.</p>
+                </div>
+
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Bell({size: 20})} Mantra Reminders</h2>
@@ -1178,6 +1704,10 @@
 
                  <div class="glass-card p-4 rounded-xl mb-4">
                     <h2 class="text-lg font-semibold mb-3">Data Management</h2>
+                    <div class="flex justify-between items-baseline mb-4 p-3 rounded-lg bg-black/10">
+                        <span class="text-sm text-white/80">Voice Recordings Storage Used:</span>
+                        <span class="text-lg font-bold text-teal">${getAudioStorageUsage()}</span>
+                    </div>
                     <div class="flex flex-col sm:flex-row gap-3">
                         <button data-action="export-data" class="flex-1 p-3 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center justify-center gap-2">
                             ${ICONS.Download({size: 20})} Export Data
@@ -1187,6 +1717,11 @@
                         </button>
                         <input type="file" id="import-file-input" class="hidden" accept=".json">
                     </div>
+                     <div class="mt-3">
+                        <button data-action="delete-all-recordings" class="w-full p-3 rounded-lg bg-rose-600/50 text-white hover:bg-rose-600/70 transition-colors flex items-center justify-center gap-2">
+                            ${ICONS.Trash2({size: 20})} Delete All Recordings
+                        </button>
+                     </div>
                 </div>
 
                  <div class="mt-6 text-center">
@@ -1194,7 +1729,7 @@
                  </div>
             </div>
         `;
-        renderPage(content, { showBackButton: true });
+        renderPage(content, { showBackButton: true, showUndoRedo: true });
     };
     
     // --- SWIPE LOGIC ---
@@ -1206,6 +1741,10 @@
 
         const handleSwipe = (diff) => {
             if (Math.abs(diff) > 50) { // Threshold
+                resetSlideshowTimer();
+                if(!audioPlayer.paused) stopPlayback();
+                if(currentlyRecordingMantraId) stopRecording();
+
                 let newIndex = state.currentMantraIndex;
                 if (diff > 0) { // Swipe Right
                     newIndex = (state.currentMantraIndex - 1 + state.userMantras.length) % state.userMantras.length;
@@ -1226,6 +1765,7 @@
         };
         
         swipeArea.addEventListener('touchstart', (e) => {
+            stopSlideshow();
             startX = e.touches[0].clientX;
             isSwiping = true;
         }, { passive: true });
@@ -1254,6 +1794,124 @@
         });
     }
 
+    // --- UNDO/REDO ---
+    const getActionDescription = (action) => {
+        switch (action.type) {
+            case 'ADD_MANTRA': return 'Mantra added.';
+            case 'REMOVE_MANTRA': return 'Mantra removed.';
+            case 'UPDATE_MANTRA_PRIORITY': return 'Priority updated.';
+            case 'ADD_AFFIRMATION': return 'Affirmation added.';
+            case 'REMOVE_AFFIRMATION': return 'Affirmation removed.';
+            case 'UPDATE_SETTING': return `Setting updated.`;
+            case 'SET_RECORDING': return 'Recording saved.';
+            case 'DELETE_RECORDING': return 'Recording deleted.';
+            default: return 'Action performed.';
+        }
+    };
+
+    const performAction = (action) => {
+        executeAction(action);
+        undoHistory.push(action);
+        redoHistory = [];
+        saveState();
+        router(); // Re-render current page
+        renderToast(getActionDescription(action), true);
+    };
+
+    const undo = () => {
+        if (undoHistory.length === 0) return;
+        const action = undoHistory.pop();
+        reverseAction(action);
+        redoHistory.push(action);
+        saveState();
+        router();
+        renderToast('Action undone.', false);
+    };
+
+    const redo = () => {
+        if (redoHistory.length === 0) return;
+        const action = redoHistory.pop();
+        executeAction(action);
+        undoHistory.push(action);
+        saveState();
+        router();
+        renderToast('Action redone.', false);
+    };
+    
+    const executeAction = (action) => {
+        const { type, payload } = action;
+        switch (type) {
+            case 'ADD_MANTRA':
+                state.userMantras.push(payload.mantra);
+                break;
+            case 'REMOVE_MANTRA':
+                state.userMantras = state.userMantras.filter(m => m.id !== payload.mantra.id);
+                if (state.audioRecordings[payload.mantra.id]) {
+                    delete state.audioRecordings[payload.mantra.id];
+                }
+                break;
+            case 'UPDATE_MANTRA_PRIORITY':
+                const mantraToUpdate = state.userMantras.find(m => m.id === payload.mantraId);
+                if (mantraToUpdate) mantraToUpdate.priority = payload.newPriority;
+                break;
+            case 'ADD_AFFIRMATION':
+                state.userAffirmations.push(payload.affirmation);
+                break;
+            case 'REMOVE_AFFIRMATION':
+                state.userAffirmations = state.userAffirmations.filter(a => a.id !== payload.affirmation.id);
+                break;
+            case 'UPDATE_SETTING':
+                setNestedValue(state.settings, payload.key, payload.newValue);
+                applySettings();
+                break;
+            case 'SET_RECORDING':
+                state.audioRecordings[payload.mantraId] = payload.newRecording;
+                break;
+            case 'DELETE_RECORDING':
+                delete state.audioRecordings[payload.mantraId];
+                break;
+        }
+    };
+
+    const reverseAction = (action) => {
+        const { type, payload } = action;
+        switch (type) {
+            case 'ADD_MANTRA': // Undo adding is removing
+                state.userMantras = state.userMantras.filter(m => m.id !== payload.mantra.id);
+                break;
+            case 'REMOVE_MANTRA': // Undo removing is adding back
+                state.userMantras.splice(payload.index, 0, payload.mantra);
+                if (payload.recording) {
+                    state.audioRecordings[payload.mantra.id] = payload.recording;
+                }
+                break;
+            case 'UPDATE_MANTRA_PRIORITY':
+                const mantraToUpdate = state.userMantras.find(m => m.id === payload.mantraId);
+                if (mantraToUpdate) mantraToUpdate.priority = payload.oldPriority;
+                break;
+            case 'ADD_AFFIRMATION':
+                state.userAffirmations = state.userAffirmations.filter(a => a.id !== payload.affirmation.id);
+                break;
+            case 'REMOVE_AFFIRMATION':
+                state.userAffirmations.splice(payload.index, 0, payload.affirmation);
+                break;
+            case 'UPDATE_SETTING':
+                setNestedValue(state.settings, payload.key, payload.oldValue);
+                applySettings();
+                break;
+            case 'SET_RECORDING':
+                if (payload.oldRecording) {
+                    state.audioRecordings[payload.mantraId] = payload.oldRecording;
+                } else {
+                    delete state.audioRecordings[payload.mantraId];
+                }
+                break;
+            case 'DELETE_RECORDING':
+                state.audioRecordings[payload.mantraId] = payload.recording;
+                break;
+        }
+    };
+
 
     // --- ROUTER ---
     const router = () => {
@@ -1265,8 +1923,7 @@
         }
 
         if (path.startsWith('/onboarding')) {
-            const step = path.split('/')[2] || 'welcome';
-            renderOnboarding(step);
+            renderOnboarding(path.split('/')[2] || 'welcome');
         } else {
             applySettings();
             switch (path) {
@@ -1324,6 +1981,8 @@
 
     document.addEventListener('change', e => {
         const target = e.target;
+        const action = target.dataset.action;
+        
         if (target.id === 'import-file-input' && target.files.length > 0) {
             const file = target.files[0];
             const reader = new FileReader();
@@ -1344,14 +2003,7 @@
                         'Importing will overwrite all current data. Are you sure you want to continue?',
                         () => {
                             // Overwrite state with imported data, providing defaults for any missing keys
-                            state.userMantras = importedData.userMantras || [];
-                            state.userAffirmations = importedData.userAffirmations || [];
-                            state.settings = { ...defaultSettings, ...importedData.settings }; // Merge to be safe
-                            state.progress = importedData.progress || {};
-                            state.isOnboardingComplete = importedData.isOnboardingComplete || false;
-                            state.achievements = importedData.achievements || INITIAL_ACHIEVEMENTS;
-                            state.dailyAffirmation = importedData.dailyAffirmation || null;
-                            
+                            state = { ...state, ...importedData, settings: { ...defaultSettings, ...importedData.settings }};
                             saveState();
                             applySettings();
                             alert('Data imported successfully! The app will now reload.');
@@ -1375,11 +2027,18 @@
             reader.readAsText(file);
         }
 
-        if (target.dataset.action === 'set-mantra-sort') {
+        if (action === 'set-mantra-sort') {
             myMantrasSortOrder = target.value;
             const activeFilterBtn = document.querySelector('[data-action="library-priority-filter"][class*="bg-white"]');
             const priorityFilter = activeFilterBtn ? activeFilterBtn.dataset.priority : 'All';
             renderLibraryContent('my-mantras', { priorityFilter });
+        }
+
+        if (action === 'set-slideshow-interval') {
+             performAction({
+                type: 'UPDATE_SETTING',
+                payload: { key: 'slideshow.interval', oldValue: state.settings.slideshow.interval, newValue: parseInt(target.value, 10) }
+            });
         }
     });
 
@@ -1395,6 +2054,8 @@
         switch (action) {
             case 'nav': window.location.hash = target.dataset.path; break;
             case 'go-back': window.history.back(); break;
+            case 'undo': undo(); break;
+            case 'redo': redo(); break;
             case 'filter-mantras': renderMantraSelectionList(target.dataset.category); break;
             case 'library-filter': {
                 const searchTerm = document.getElementById('mantra-search-input')?.value || '';
@@ -1454,6 +2115,11 @@
             case 'set-mantra-index': {
                  const newIndex = parseInt(target.dataset.index, 10);
                  if (newIndex === state.currentMantraIndex) break;
+                 
+                 resetSlideshowTimer();
+
+                 if(!audioPlayer.paused) stopPlayback();
+                 if(currentlyRecordingMantraId) stopRecording();
 
                  state.currentMantraIndex = newIndex;
                  const mantraText = document.getElementById('mantra-text');
@@ -1467,101 +2133,110 @@
                  }
                  break;
             }
-            case 'library-tab': renderLibraryContent(target.dataset.tab); break;
+            case 'library-tab': 
+                undoHistory = []; redoHistory = []; // Clear history on tab change
+                renderLibraryContent(target.dataset.tab); 
+                break;
             case 'toggle-library-mantra': {
                  const libMantra = CURATED_MANTRAS.find(m => m.id === mantraId) || state.userMantras.find(m => m.id === mantraId);
-                 if (state.userMantras.some(m => m.id === mantraId)) {
-                     removeMantra(mantraId);
+                 const isAdded = state.userMantras.some(m => m.id === mantraId);
+                 if (isAdded) {
+                     const index = state.userMantras.findIndex(m => m.id === mantraId);
+                     const recording = state.audioRecordings[mantraId];
+                     performAction({ type: 'REMOVE_MANTRA', payload: { mantra: libMantra, index, recording } });
                  } else {
-                     addMantra({ ...libMantra, priority: 'Medium' });
-                 }
-                 const activeTab = document.querySelector('[data-action="library-tab"][class*="border-teal"]').dataset.tab;
-                 if (activeTab === 'curated') {
-                    const searchTerm = document.getElementById('mantra-search-input')?.value || '';
-                    const activeCategory = document.querySelector('[data-action="library-filter"][class*="bg-white"]')?.dataset.category || CATEGORIES[0];
-                    renderLibraryContent(activeTab, { searchTerm, category: activeCategory });
-                 } else {
-                    renderLibraryContent(activeTab);
+                     const mantraToAdd = { ...libMantra, priority: 'Medium', createdAt: Date.now() };
+                     performAction({ type: 'ADD_MANTRA', payload: { mantra: mantraToAdd } });
                  }
                  break;
              }
             case 'set-mantra-priority': {
-                const mantraToUpdateId = target.dataset.mantraId;
-                const newPriority = target.dataset.priority;
-                const mantraIndex = state.userMantras.findIndex(m => m.id === mantraToUpdateId);
-                if (mantraIndex !== -1) {
-                    state.userMantras[mantraIndex].priority = newPriority;
-                    saveState();
-                    const activeFilterBtn = document.querySelector('[data-action="library-priority-filter"][class*="bg-white"]');
-                    const priorityFilter = activeFilterBtn ? activeFilterBtn.dataset.priority : 'All';
-                    renderLibraryContent('my-mantras', { priorityFilter });
+                const mantraToUpdate = state.userMantras.find(m => m.id === mantraId);
+                if (mantraToUpdate) {
+                    performAction({
+                        type: 'UPDATE_MANTRA_PRIORITY',
+                        payload: { mantraId, oldPriority: mantraToUpdate.priority, newPriority: target.dataset.priority }
+                    });
                 }
                 break;
             }
             case 'add-new-affirmation':
                 const input = document.getElementById('new-affirmation-input');
                 if (input && input.value.trim()) {
-                    addAffirmation(input.value.trim());
-                    renderLibraryContent('my-affirmations');
+                    const newAffirmation = { id: `affirm-${Date.now()}`, text: input.value.trim() };
+                    performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
                 }
                 break;
             case 'remove-affirmation':
-                removeAffirmation(target.dataset.affirmationId);
-                renderLibraryContent('my-affirmations');
+                const affirmationToRemove = state.userAffirmations.find(a => a.id === target.dataset.affirmationId);
+                const index = state.userAffirmations.findIndex(a => a.id === target.dataset.affirmationId);
+                if(affirmationToRemove) {
+                    performAction({ type: 'REMOVE_AFFIRMATION', payload: { affirmation: affirmationToRemove, index }});
+                }
                 break;
             case 'add-new-custom-mantra': {
                 const textInput = document.getElementById('new-custom-mantra-text');
                 const categoryInput = document.getElementById('new-custom-mantra-category');
                 const priorityInput = document.getElementById('new-custom-mantra-priority');
-
                 if (textInput && textInput.value.trim()) {
-                    const newMantra = {
-                        id: `c-${Date.now()}`,
-                        text: textInput.value.trim(),
-                        category: categoryInput.value,
-                        priority: priorityInput.value,
-                        createdAt: Date.now(),
-                    };
-                    addMantra(newMantra);
+                    const newMantra = { id: `c-${Date.now()}`, text: textInput.value.trim(), category: categoryInput.value, priority: priorityInput.value, createdAt: Date.now() };
+                    performAction({ type: 'ADD_MANTRA', payload: { mantra: newMantra } });
                     unlockAchievement('custom_mantra');
-                    const activeFilterBtn = document.querySelector('[data-action="library-priority-filter"][class*="bg-white"]');
-                    const priorityFilter = activeFilterBtn ? activeFilterBtn.dataset.priority : 'All';
-                    renderLibraryContent('my-mantras', { priorityFilter });
                 }
                 break;
             }
             case 'set-theme':
-                state.settings.theme = target.dataset.theme;
-                saveState();
-                applySettings();
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'theme', oldValue: state.settings.theme, newValue: target.dataset.theme }
+                });
                 break;
             case 'set-font':
-                state.settings.font = target.dataset.font;
-                saveState();
-                applySettings();
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'font', oldValue: state.settings.font, newValue: target.dataset.font }
+                });
                 break;
             case 'toggle-dark-mode':
-                state.settings.isDarkMode = !state.settings.isDarkMode;
-                saveState();
-                applySettings();
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'isDarkMode', oldValue: state.settings.isDarkMode, newValue: !state.settings.isDarkMode }
+                });
+                break;
+            case 'toggle-celebration-sounds':
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'celebrationSounds.enabled', oldValue: state.settings.celebrationSounds.enabled, newValue: !state.settings.celebrationSounds.enabled }
+                });
+                break;
+            case 'toggle-haptics':
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'haptics.enabled', oldValue: state.settings.haptics.enabled, newValue: !state.settings.haptics.enabled }
+                });
+                break;
+            case 'toggle-slideshow':
+                 performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'slideshow.enabled', oldValue: state.settings.slideshow.enabled, newValue: !state.settings.slideshow.enabled }
+                });
+                break;
+            case 'toggle-voice-features': 
+                 performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'voiceFeatures.enabled', oldValue: state.settings.voiceFeatures.enabled, newValue: !state.settings.voiceFeatures.enabled }
+                });
                 break;
             case 'set-notification-prop': {
                 const type = target.dataset.type;
                 const period = target.dataset.period;
                 const prop = target.dataset.prop;
-                const value = target.type === 'checkbox' ? target.checked : target.value;
-
-                if (type === 'affirmation' && prop === 'enabled') {
-                    state.settings.notifications.affirmation.enabled = !state.settings.notifications.affirmation.enabled;
-                } else if (type === 'mantras') {
-                    if (period && prop === 'enabled') {
-                        state.settings.notifications.mantras[period].enabled = value;
-                    } else if (prop === 'enabled') {
-                        state.settings.notifications.mantras.enabled = !state.settings.notifications.mantras.enabled;
-                    }
+                const path = type === 'affirmation' ? `notifications.affirmation.${prop}` : `notifications.mantras${period ? `.${period}` : ''}.${prop}`;
+                const oldValue = getNestedValue(state.settings, path);
+                const newValue = target.type === 'checkbox' ? target.checked : target.value;
+                if(oldValue !== newValue) {
+                     performAction({ type: 'UPDATE_SETTING', payload: { key: path, oldValue, newValue } });
                 }
-                saveState();
-                renderSettings();
                 break;
             }
             case 'install-pwa':
@@ -1585,13 +2260,66 @@
                     'Are you sure you want to delete all your data? This action is permanent and cannot be undone.',
                     () => {
                         Object.values(storageKeys).forEach(key => localStorage.removeItem(key));
-                        state = { userMantras: [], userAffirmations: [], settings: JSON.parse(JSON.stringify(defaultSettings)), progress: {}, isOnboardingComplete: false, achievements: INITIAL_ACHIEVEMENTS, currentMantraIndex: 0, onboardingTempMantras: [], dailyAffirmation: null };
+                        state = { userMantras: [], userAffirmations: [], settings: JSON.parse(JSON.stringify(defaultSettings)), progress: {}, isOnboardingComplete: false, achievements: INITIAL_ACHIEVEMENTS, currentMantraIndex: 0, onboardingTempMantras: [], dailyAffirmation: null, audioRecordings: {}, lastDailyGoalCelebrated: null, lastStreakMilestoneCelebrated: 0 };
                         window.location.hash = '';
                         window.location.reload();
                     },
                     { confirmText: 'Reset', confirmVariant: 'destructive' }
                 );
                 break;
+            // --- Audio Actions ---
+            case 'record-voice': startRecording(mantraId); break;
+            case 'stop-recording': stopRecording(); break;
+            case 'play-voice': playRecording(mantraId); break;
+            case 'pause-voice': pauseRecording(); break;
+            case 'stop-voice': stopPlayback(); break;
+            case 'delete-voice': deleteRecording(mantraId); break;
+            case 'delete-all-recordings':
+                renderConfirmationModal(
+                    'Delete All Recordings?',
+                    'This will permanently remove all of your voice recordings. This action cannot be undone.',
+                    () => {
+                        state.audioRecordings = {};
+                        saveState();
+                        renderSettings();
+                    },
+                    { confirmText: 'Delete All', confirmVariant: 'destructive' }
+                );
+                break;
+        }
+    });
+
+    // --- AUDIO PLAYER GLOBAL LISTENERS ---
+    audioPlayer.addEventListener('play', () => {
+        const controls = document.getElementById(`audio-controls-${currentlyPlayingMantraId}`);
+        if(controls) controls.innerHTML = renderAudioInterface(currentlyPlayingMantraId);
+    });
+    audioPlayer.addEventListener('pause', () => {
+        const controls = document.getElementById(`audio-controls-${currentlyPlayingMantraId}`);
+        if(controls) controls.innerHTML = renderAudioInterface(currentlyPlayingMantraId);
+        startSlideshow();
+    });
+    audioPlayer.addEventListener('ended', () => {
+        stopPlayback();
+    });
+    audioPlayer.addEventListener('timeupdate', () => {
+        const progressEl = document.querySelector(`.audio-progress-bar-inner[data-mantra-id="${currentlyPlayingMantraId}"]`);
+        if (progressEl) {
+            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
+            progressEl.style.width = `${progress}%`;
+        }
+    });
+
+    // --- KEYBOARD SHORTCUTS ---
+    document.addEventListener('keydown', e => {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 'z') {
+                e.preventDefault();
+                undo();
+            } else if (e.key === 'y') {
+                e.preventDefault();
+                redo();
+            }
         }
     });
 
@@ -1604,11 +2332,22 @@
         }
     });
 
-    window.addEventListener('hashchange', router);
+    window.addEventListener('hashchange', () => {
+      stopSlideshow();
+      if (!audioPlayer.paused) stopPlayback();
+      if (currentlyRecordingMantraId) stopRecording();
+      undoHistory = []; // Clear history on page navigation
+      redoHistory = [];
+      router();
+    });
+
     document.addEventListener('DOMContentLoaded', () => {
         // ServiceWorker registration removed to prevent cross-origin errors in hosted environments.
         // Offline capability is handled via localStorage.
         loadState();
+        if(!isAudioSupported) {
+          state.settings.voiceFeatures.enabled = false;
+        }
         router();
     });
 
