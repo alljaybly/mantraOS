@@ -31,16 +31,16 @@ Built as a self-contained, **zero-dependency vanilla JavaScript application**, i
 
 ## 📚 Table of Contents
 
-- [Live Demo](#live-demo)
-- [Screenshots](#screenshots)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Technology Stack](#technology-stack)
+- [Live Demo](#-live-demo)
+- [Screenshots](#-screenshots)
+- [Key Features](#-key-features)
+- [How It Works](#-how-it-works)
+- [Technology Stack](#️-technology-stack)
 - [🚀 Getting Started](#-getting-started)
 - [🤝 Contributing](#-contributing)
 - [🗺️ Roadmap](#️-roadmap)
-- [File Structure](#file-structure)
-- [License](#license)
+- [File Structure](#-file-structure)
+- [License](#-license)
 
 ## 🌐 Live Demo
 
