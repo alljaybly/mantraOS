@@ -44,6 +44,7 @@
             'gradient-shift': 'gradientShift 20s ease infinite',
             'pulse-ring': 'pulseRing 2s ease-out infinite',
             'spin': 'spin 1s linear infinite',
+            'particle-effect': 'particleEffect 1s ease-out forwards',
           },
           keyframes: {
             fadeIn: {
@@ -86,6 +87,11 @@
               'from': { transform: 'rotate(0deg)' },
               'to': { transform: 'rotate(360deg)' },
             },
+            particleEffect: {
+                '0%': { transform: 'scale(0.5) translateY(0)', opacity: 0 },
+                '20%': { opacity: 1 },
+                '100%': { transform: 'scale(1.2) translateY(-80px)', opacity: 0 },
+            },
           }
         }
       }
@@ -118,31 +124,6 @@
     .theme-gradient-3 { background-image: linear-gradient(to top right, #4facfe, #00f2fe); }
     .theme-gradient-4 { background-image: linear-gradient(to top right, #434343, #000000); }
 
-    /* Page transition styles */
-    .page-enter {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    .page-enter-active {
-        opacity: 1;
-        transform: translateX(0);
-        transition: opacity 300ms, transform 300ms;
-    }
-    .page-exit {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    .page-exit-active {
-        opacity: 0;
-        transform: translateX(-100%);
-        transition: opacity 300ms, transform 300ms;
-    }
-    
-    /* Simple CSS bar chart for progress */
-    .bar-chart-bar {
-        transition: height 0.3s ease-out;
-    }
-
     /* Confetti styles */
     .confetti-piece {
         position: absolute;
@@ -150,6 +131,32 @@
         height: 16px;
         top: -20px;
         will-change: transform, opacity;
+    }
+    
+    /* Transition particle styles */
+    .transition-particle {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        pointer-events: none;
+        will-change: transform, opacity;
+    }
+
+    /* Accessibility: Reduce motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-delay: -1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        background-attachment: initial !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+      }
+      .animate-float {
+        animation: none !important;
+      }
     }
   </style>
 
@@ -277,7 +284,7 @@
         voiceFeatures: { enabled: true },
         celebrationSounds: { enabled: true },
         haptics: { enabled: true },
-        slideshow: { enabled: false, interval: 7 }, // interval in seconds
+        slideshow: { enabled: false, interval: 6 }, // interval in seconds
         aiFeatures: { enabled: true },
         language: 'auto',
     };
@@ -552,6 +559,7 @@
     const goToNextMantra = () => {
         const newIndex = (state.currentMantraIndex + 1) % state.userMantras.length;
         state.currentMantraIndex = newIndex;
+        renderTransitionParticles();
 
         const mantraText = document.getElementById('mantra-text');
         if (mantraText) {
@@ -853,6 +861,23 @@
     };
 
     // --- CELEBRATION LOGIC ---
+    const renderTransitionParticles = () => {
+        const container = document.getElementById('swipe-area');
+        if (!container) return;
+
+        const colors = ['#f6d365', '#4facfe', '#ffffff'];
+        for (let i = 0; i < 8; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'transition-particle';
+            particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.left = `${20 + Math.random() * 60}%`;
+            particle.style.bottom = `${Math.random() * 20}%`;
+            particle.style.animation = `particle-effect ${0.5 + Math.random() * 0.5}s ${Math.random() * 0.2}s ease-out forwards`;
+            container.appendChild(particle);
+            setTimeout(() => particle.remove(), 1000);
+        }
+    };
+
     const renderCelebrationModal = (title, description, icon) => {
         const modalId = 'celebration-modal';
         document.getElementById(modalId)?.remove();
@@ -1025,7 +1050,7 @@
         ` : '';
 
         const mainAppLayout = `
-            <div class="relative min-h-screen ${isAppView ? 'pb-24' : ''}">
+            <div class="relative min-h-screen ${isAppView ? 'pb-24' : ''} animate-fade-in">
                 <main class="p-4 md:p-6">${headerContent}${content}</main>
                 ${isAppView ? renderBottomNav() : ''}
             </div>
@@ -1238,7 +1263,7 @@
         let content;
         if (state.userMantras.length === 0) {
             content = `
-                <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center animate-fade-in">
+                <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
                     ${dailyAffirmationHtml}
                     <h2 class="text-2xl font-serif mb-4">Your mantra space is empty.</h2>
                     <p class="mb-6 text-white/80">Add some mantras from the library to get started!</p>
@@ -1267,7 +1292,7 @@
 
             content = `
                 <div class="flex flex-col h-[calc(100vh-8rem)] justify-between">
-                  <div class="flex justify-around text-center glass-card p-3 rounded-full animate-fade-in">
+                  <div class="flex justify-around text-center glass-card p-3 rounded-full">
                     <div><p class="text-sm text-white/70">Total Views</p><p class="font-bold text-lg">${getTotalViews()}</p></div>
                     <div><p class="text-sm text-white/70">Current Streak</p><p class="font-bold text-lg">${streakIcon}${streak} days</p></div>
                     <div><p class="text-sm text-white/70">Views Today</p><p class="font-bold text-lg">${state.progress[currentMantra?.id]?.views || 0}</p></div>
@@ -1279,7 +1304,7 @@
                     ${rephraseButton}
                     <p id="mantra-text" class="text-4xl md:text-6xl font-serif text-center leading-tight animate-fade-in animate-float">"${getMantraText(currentMantra)}"</p>
                   </div>
-                  <div class="text-center animate-fade-in">
+                  <div class="text-center">
                     <div id="audio-controls-${currentMantra?.id}" class="flex justify-center mb-4">
                         ${renderAudioInterface(currentMantra?.id)}
                     </div>
@@ -1305,7 +1330,7 @@
         let content;
         if (state.userAffirmations.length === 0) {
             content = `
-                <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center animate-fade-in">
+                <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
                     <h2 class="text-2xl font-serif mb-4">No affirmations yet.</h2>
                     <p class="mb-6 text-white/80">Visit the library to add your first daily affirmation.</p>
                     <a href="#/library">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Add Affirmation`)}</a>
@@ -1314,7 +1339,7 @@
         } else {
             const randomAffirmation = state.userAffirmations[Math.floor(Math.random() * state.userAffirmations.length)];
             content = `
-                <div class="flex flex-col h-[calc(100vh-12rem)] items-center justify-center text-center animate-fade-in">
+                <div class="flex flex-col h-[calc(100vh-12rem)] items-center justify-center text-center">
                     <h1 class="text-2xl font-serif mb-8 text-white/80">Today's Affirmation</h1>
                     <p class="text-4xl md:text-5xl font-serif leading-tight">"${randomAffirmation.text}"</p>
                 </div>
@@ -1325,7 +1350,7 @@
 
     const renderLibrary = () => {
         const content = `
-            <div class="animate-fade-in" id="library-view">
+            <div id="library-view">
                 <h1 class="text-4xl font-serif text-center mb-6">Library</h1>
                 <div class="flex justify-center mb-6 border-b-2 border-white/20">
                     <button data-action="library-tab" data-tab="curated" class="px-4 py-2 transition-colors text-white border-b-2 border-teal">Discover</button>
@@ -1543,7 +1568,7 @@
         }
 
         const content = `
-            <div class="animate-fade-in">
+            <div>
                 <h1 class="text-4xl font-serif text-center mb-6">Your Progress</h1>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -1699,7 +1724,7 @@
         `;
 
         const content = `
-            <div class="animate-fade-in max-w-lg mx-auto">
+            <div class="max-w-lg mx-auto">
                 <h1 class="text-4xl font-serif text-center mb-6">Settings</h1>
                 
                 ${aiFeaturesSection}
@@ -1742,6 +1767,7 @@
                             <label for="slideshow-interval">Display each mantra for</label>
                             <select id="slideshow-interval" data-action="set-slideshow-interval" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
                                 <option value="5" ${s.slideshow.interval === 5 ? 'selected' : ''}>5 seconds</option>
+                                <option value="6" ${s.slideshow.interval === 6 ? 'selected' : ''}>6 seconds</option>
                                 <option value="7" ${s.slideshow.interval === 7 ? 'selected' : ''}>7 seconds</option>
                                 <option value="10" ${s.slideshow.interval === 10 ? 'selected' : ''}>10 seconds</option>
                                 <option value="15" ${s.slideshow.interval === 15 ? 'selected' : ''}>15 seconds</option>
@@ -1856,6 +1882,7 @@
         const handleSwipe = (diff) => {
             if (Math.abs(diff) > 50) { // Threshold
                 resetSlideshowTimer();
+                renderTransitionParticles();
                 if(!audioPlayer.paused) stopPlayback();
                 if(currentlyRecordingMantraId) stopRecording();
 
@@ -1906,6 +1933,10 @@
               mantraText.style.opacity = '1';
             }
         });
+        
+        // Pause slideshow on hover for desktop users
+        swipeArea.addEventListener('mouseenter', stopSlideshow);
+        swipeArea.addEventListener('mouseleave', startSlideshow);
     }
 
     // --- UNDO/REDO ---
