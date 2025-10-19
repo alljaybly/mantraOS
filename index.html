@@ -190,6 +190,7 @@
         Check: createIcon('Check', '<polyline points="20 6 9 17 4 12"></polyline>'),
         Edit: createIcon('Edit', '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>'),
         CheckCircle: createIcon('CheckCircle', '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'),
+        XCircle: createIcon('XCircle', '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>'),
         PlusCircle: createIcon('PlusCircle', '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>'),
         Home: createIcon('Home', '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>'),
         Library: createIcon('Library', '<path d="m16 6 4 14"></path><path d="M12 6v14"></path><path d="M8 8v12"></path><path d="M4 4v16"></path>'),
@@ -223,9 +224,52 @@
     };
 
     // --- CHROME AI ---
-    const isAiSupported = typeof window.ai !== 'undefined';
     let aiTextSession = null;
     let aiTranslator = null;
+    const isAnyAiFeatureEnabled = () => state.settings.aiFeatures.enabled && (state.aiStatus.supported || state.settings.demoMode.enabled);
+
+    const checkAiStatus = async () => {
+        console.log('[MantraOS AI Diagnostics] Starting AI feature check...');
+        const status = {
+            checked: true,
+            supported: typeof window.ai !== 'undefined',
+            text: false,
+            translator: false,
+            rewriter: false,
+            proofreader: false
+        };
+
+        if (status.supported) {
+            console.log('[MantraOS AI Diagnostics] window.ai object found.');
+            try {
+                await window.ai.createTextSession();
+                status.text = true;
+                console.log('[MantraOS AI Diagnostics] createTextSession: Available');
+            } catch (e) { console.log('[MantraOS AI Diagnostics] createTextSession: Unavailable', e.message); }
+
+            try {
+                await window.ai.translator.create();
+                status.translator = true;
+                console.log('[MantraOS AI Diagnostics] translator.create: Available');
+            } catch (e) { console.log('[MantraOS AI Diagnostics] translator.create: Unavailable', e.message); }
+
+            try {
+                await window.ai.rewriter.create();
+                status.rewriter = true;
+                console.log('[MantraOS AI Diagnostics] rewriter.create: Available');
+            } catch (e) { console.log('[MantraOS AI Diagnostics] rewriter.create: Unavailable', e.message); }
+
+            try {
+                await window.ai.proofreader.create();
+                status.proofreader = true;
+                console.log('[MantraOS AI Diagnostics] proofreader.create: Available');
+            } catch (e) { console.log('[MantraOS AI Diagnostics] proofreader.create: Unavailable', e.message); }
+        } else {
+            console.log('[MantraOS AI Diagnostics] window.ai object not found. AI features are unavailable.');
+        }
+        state.aiStatus = status;
+        console.log('[MantraOS AI Diagnostics] Check complete. Final status:', state.aiStatus);
+    };
 
     // --- CONSTANTS ---
     const CATEGORIES = ['Money', 'Health', 'Relationships', 'Career', 'Confidence'];
@@ -286,6 +330,7 @@
         haptics: { enabled: true },
         slideshow: { enabled: false, interval: 6 }, // interval in seconds
         aiFeatures: { enabled: true },
+        demoMode: { enabled: false },
         language: 'auto',
     };
 
@@ -302,6 +347,14 @@
       audioRecordings: {},
       lastDailyGoalCelebrated: null, // YYYY-MM-DD
       lastStreakMilestoneCelebrated: 0, // e.g., 7, 14, 21
+      aiStatus: {
+          checked: false,
+          supported: false,
+          text: false,
+          translator: false,
+          rewriter: false,
+          proofreader: false
+      },
     };
 
     const storageKeys = {
@@ -532,6 +585,7 @@
     const exportUserData = () => {
         try {
             const backupData = { ...state };
+            delete backupData.aiStatus; // Don't export runtime status
             const jsonString = JSON.stringify(backupData, null, 2);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1284,7 +1338,8 @@
                 </div>
             ` : '';
             
-            const rephraseButton = (isAiSupported && state.settings.aiFeatures.enabled) ? `
+            const canRewrite = state.settings.aiFeatures.enabled && (state.aiStatus.rewriter || state.settings.demoMode.enabled);
+            const rephraseButton = canRewrite ? `
                 <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-full" aria-label="Rephrase this mantra">
                     ${ICONS.Wand2({size: 20})}
                 </button>
@@ -1368,7 +1423,7 @@
         const container = document.getElementById('library-content');
         if (!container) return;
         
-        const showAiFeatures = isAiSupported && state.settings.aiFeatures.enabled;
+        const showAiFeatures = isAnyAiFeatureEnabled();
 
         let content = '';
         if (tab === 'curated') {
@@ -1455,7 +1510,8 @@
                     <div class="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
                     ${sortedMantras.length > 0 ? sortedMantras.map(mantra => {
                         const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
-                        const rephraseButton = showAiFeatures ? `
+                        const canRewrite = state.settings.aiFeatures.enabled && (state.aiStatus.rewriter || state.settings.demoMode.enabled);
+                        const rephraseButton = canRewrite ? `
                             <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Rephrase this mantra">
                                 ${ICONS.Wand2({ size: 16 })}
                             </button>
@@ -1492,7 +1548,8 @@
                         `}).join('') : `<div class="text-center p-8"><p class="text-white/80">No mantras found with this priority.</p></div>`}
                     </div>`;
             }
-             content += `
+            const canProofread = state.settings.aiFeatures.enabled && (state.aiStatus.proofreader || state.settings.demoMode.enabled);
+            content += `
                 <div class="mt-6 border-t border-white/20 pt-4">
                     <h3 class="text-lg font-semibold text-center mb-3">Create Your Own Mantra</h3>
                     <div class="space-y-3">
@@ -1508,7 +1565,7 @@
                             <option value="Low">Low Priority</option>
                         </select>
                         <div class="flex gap-2">
-                            ${showAiFeatures ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50" disabled>${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Check Grammar</button>` : ''}
+                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50" disabled>${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Check Grammar</button>` : ''}
                             ${renderButton('Add Custom Mantra', { variant: 'secondary', additionalClasses: 'flex-1', attributes: 'data-action="add-new-custom-mantra" id="add-custom-mantra-btn" disabled' })}
                         </div>
                     </div>
@@ -1691,34 +1748,78 @@
                 </div>`;
         };
         
+        const renderAiStatusRow = (label, isAvailable) => `
+            <div class="flex justify-between items-center text-sm py-1">
+                <span class="text-white/80">${label}</span>
+                ${isAvailable 
+                    ? `<span class="flex items-center gap-1 font-semibold text-teal-300">${ICONS.CheckCircle({size:16})} Available</span>`
+                    : `<span class="flex items-center gap-1 font-semibold text-rose-400">${ICONS.XCircle({size:16})} Unavailable</span>`
+                }
+            </div>
+        `;
+
+        const aiUnavailableInstructions = `
+            <div class="text-sm text-yellow-300 mt-3 p-3 bg-yellow-900/40 rounded-lg space-y-2">
+                <p class="font-bold">On-Device AI Not Detected!</p>
+                <p>To enable these privacy-preserving features, you need a compatible version of Google Chrome (127+).</p>
+                <ol class="list-decimal list-inside space-y-1 pl-2">
+                    <li>Download <a href="https://www.google.com/chrome/canary/" target="_blank" rel="noopener" class="underline">Chrome Canary</a> (or ensure you're on Chrome 127+).</li>
+                    <li>Enable the following flag: <a href="chrome://flags/#prompt-api-for-gemini-nano" target="_blank" rel="noopener" class="underline font-mono">#prompt-api-for-gemini-nano</a>.</li>
+                    <li>Relaunch Chrome and re-check the AI status.</li>
+                </ol>
+            </div>
+        `;
+
         const aiFeaturesSection = `
             <div class="glass-card p-4 rounded-xl mb-4">
                 <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Sparkles({size: 20})} AI Features</h2>
-                    ${isAiSupported ? `
-                        <button data-action="toggle-ai-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.aiFeatures.enabled ? 'bg-teal' : 'bg-white/20'}">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.aiFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>` : ''}
+                    <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Sparkles({size: 20})} AI & Demo Mode</h2>
+                    <button data-action="toggle-ai-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.aiFeatures.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.aiFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                    </button>
                 </div>
-                ${isAiSupported ? `
-                    ${s.aiFeatures.enabled ? `
-                    <div class="text-sm mt-3 pt-3 border-t border-white/20 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <label for="language-select" class="flex items-center gap-2">${ICONS.Languages({size: 16})} Language</label>
-                            <select id="language-select" data-action="set-language" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
-                                ${Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => `<option value="${code}" ${s.language === code ? 'selected' : ''}>${name}</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>` : ''}
-                    <div class="flex items-start gap-2 mt-3 text-xs text-white/60 p-2 bg-black/20 rounded-lg">
-                        ${ICONS.Cpu({size: 28, className: 'flex-shrink-0 mt-1'})}
-                        <div>
-                            <p class="font-bold text-white/80">Powered by Chrome AI</p>
-                            <p>All AI features run directly on your device for maximum privacy and speed. Your data never leaves your computer.</p>
-                        </div>
+                
+                ${s.aiFeatures.enabled ? `
+                <div class="mt-3 pt-3 border-t border-white/20 space-y-3">
+                    ${!state.aiStatus.supported ? aiUnavailableInstructions : ''}
+
+                    <div class="p-3 bg-black/20 rounded-lg">
+                        <h3 class="font-semibold mb-2">AI Feature Status</h3>
+                        ${renderAiStatusRow('Text Generation', state.aiStatus.text)}
+                        ${renderAiStatusRow('Translation', state.aiStatus.translator)}
+                        ${renderAiStatusRow('Rewriting', state.aiStatus.rewriter)}
+                        ${renderAiStatusRow('Proofreading', state.aiStatus.proofreader)}
                     </div>
+                    
+                    <div class="flex gap-2">
+                        <button data-action="test-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm" ${!state.aiStatus.supported ? 'disabled' : ''}>Test AI</button>
+                        <button data-action="recheck-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm">Re-check Status</button>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <label for="language-select" class="flex items-center gap-2 text-sm">${ICONS.Languages({size: 16})} Language</label>
+                        <select id="language-select" data-action="set-language" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            ${Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => `<option value="${code}" ${s.language === code ? 'selected' : ''}>${name}</option>`).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="flex justify-between items-center pt-3 border-t border-white/20">
+                        <div class="text-sm">
+                            <p class="font-semibold">Demo Mode</p>
+                            <p class="text-white/70 text-xs">Simulate AI features if unavailable.</p>
+                        </div>
+                        <button data-action="toggle-demo-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.demoMode.enabled ? 'bg-teal' : 'bg-white/20'}">
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.demoMode.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                    
+                    <div class="text-xs text-white/60 p-2 bg-black/20 rounded-lg">
+                        <p class="font-bold">Browser Info:</p>
+                        <p class="break-all">${navigator.userAgent}</p>
+                    </div>
+                </div>
                 ` : `
-                    <p class="text-sm text-yellow-300 mt-2 pt-2 border-t border-white/20">Chrome's built-in AI is not available in your browser. Update Chrome to the latest version to enable these features.</p>
+                <p class="text-sm text-white/70 mt-2">Enable to use on-device AI for generation, translation, and more.</p>
                 `}
             </div>
         `;
@@ -2207,7 +2308,7 @@
         }
     });
 
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
         const target = e.target.closest('[data-action]');
         if (!target) return;
         
@@ -2460,6 +2561,35 @@
                     payload: { key: 'aiFeatures.enabled', oldValue: state.settings.aiFeatures.enabled, newValue: !state.settings.aiFeatures.enabled }
                 });
                 break;
+             case 'toggle-demo-mode':
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'demoMode.enabled', oldValue: state.settings.demoMode.enabled, newValue: !state.settings.demoMode.enabled }
+                });
+                break;
+            case 'recheck-ai':
+                renderLoadingModal("Re-checking AI status...");
+                await checkAiStatus();
+                closeLoadingModal();
+                renderSettings(); // Re-render the settings page with new status
+                break;
+            case 'test-ai':
+                renderLoadingModal("Testing AI...");
+                try {
+                    const session = await window.ai.createTextSession();
+                    const result = await session.prompt("Say 'hello'");
+                    closeLoadingModal();
+                    if (result.toLowerCase().includes('hello')) {
+                        renderModal("AI Test Successful", "The on-device AI is working correctly.");
+                    } else {
+                        throw new Error("Unexpected response from AI.");
+                    }
+                } catch (e) {
+                    closeLoadingModal();
+                    console.error("AI Test Failed:", e);
+                    renderModal("AI Test Failed", `Could not get a valid response from the AI. Error: ${e.message}`);
+                }
+                break;
             case 'open-ai-generate-modal': handleAiGenerate(); break;
             case 'rewrite-mantra': handleAiRewrite(mantraId); break;
             case 'proofread-mantra': handleAiProofread(); break;
@@ -2508,6 +2638,58 @@
         }
     });
     
+    // --- FAKE AI (DEMO MODE) HANDLERS ---
+    const handleFakeAiGenerate = (topic) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const fakeMantras = [
+                    `I am confident and capable in ${topic}. (Simulated)`,
+                    `I attract positive ${topic} into my life. (Simulated)`,
+                    `My connection to ${topic} grows stronger every day. (Simulated)`,
+                    `I am worthy of all the good ${topic} brings. (Simulated)`,
+                    `I embrace ${topic} with an open heart. (Simulated)`
+                ];
+                resolve(JSON.stringify(fakeMantras));
+            }, 800);
+        });
+    };
+
+    const handleFakeAiRewrite = (originalText) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const variants = [
+                    `Rephrased: ${originalText} (Simulated)`,
+                    `Alternative: ${originalText} (Simulated)`,
+                    `Another take: ${originalText} (Simulated)`
+                ];
+                resolve(variants);
+            }, 800);
+        });
+    };
+
+    const handleFakeAiProofread = (text) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                let corrected = text.trim();
+                if (corrected.length > 0) {
+                    corrected = corrected.charAt(0).toUpperCase() + corrected.slice(1);
+                    if (!['.', '!', '?'].includes(corrected.slice(-1))) {
+                        corrected += '.';
+                    }
+                }
+                resolve({ correctedText: `${corrected} (Simulated)` });
+            }, 500);
+        });
+    };
+
+    const handleFakeLanguageChange = async (newLang) => {
+        const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
+        allMantras.forEach(mantra => {
+            mantra.text.translated = `[${newLang}] ${mantra.text.original} (Simulated)`;
+        });
+        saveState();
+    };
+
     // --- AI FEATURE LOGIC ---
     async function getAiTextSession() {
         if (aiTextSession) return aiTextSession;
@@ -2549,20 +2731,26 @@
                 <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
                 <p class="text-white/80">Generating mantras about ${topic}...</p>`;
 
+            const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
+            
             try {
-                const session = await getAiTextSession();
-                if (!session) return;
-                const prompt = `Generate 5 positive affirmations about "${topic}". They should be personal, empowering, and concise. Return the result as a JSON array of strings.`;
-                const result = await session.prompt(prompt);
+                const result = isDemo 
+                    ? await handleFakeAiGenerate(topic) 
+                    : await (await getAiTextSession()).prompt(`Generate 5 positive affirmations about "${topic}". They should be personal, empowering, and concise. Return the result as a JSON array of strings.`);
+                
                 const mantras = JSON.parse(result);
                 
+                const modalTitle = isDemo 
+                    ? `Generated Mantras <span class="text-sm text-teal-300">(Simulated)</span>` 
+                    : 'Generated Mantras';
+                
                 contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4">Generated Mantras</h2>
+                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
                     <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
                     ${mantras.map((mantra, index) => `
                         <div class="glass-card p-3 flex justify-between items-center">
                             <p>"${mantra}"</p>
-                            <button data-action="add-ai-mantra" data-text="${mantra}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30">${ICONS.Plus({size: 16})}</button>
+                            <button data-action="add-ai-mantra" data-text="${mantra.replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30">${ICONS.Plus({size: 16})}</button>
                         </div>`).join('')}
                     </div>
                     ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
@@ -2592,23 +2780,32 @@
         if (!mantra) return;
 
         renderLoadingModal("Rephrasing your mantra...");
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.rewriter;
 
         try {
-            const rewriter = await window.ai.rewriter.create();
-            const iterator = await rewriter.rephrase(mantra.text.original, { numVariants: 3 });
-            const options = [];
-            for await (const response of iterator) {
-              options.push(response);
+            let options = [];
+            if (isDemo) {
+                options = await handleFakeAiRewrite(mantra.text.original);
+            } else {
+                const rewriter = await window.ai.rewriter.create();
+                const iterator = await rewriter.rephrase(mantra.text.original, { numVariants: 3 });
+                for await (const response of iterator) {
+                  options.push(response);
+                }
             }
             closeLoadingModal();
 
             const modalId = 'ai-rewrite-modal';
+            const modalTitle = isDemo 
+                ? `Choose a New Phrasing <span class="text-sm text-teal-300">(Simulated)</span>` 
+                : 'Choose a New Phrasing';
+
             const modalHTML = `
                 <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                     <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up">
-                        <h2 class="text-2xl font-serif mb-4">Choose a New Phrasing</h2>
+                        <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
                         <div class="space-y-3 mb-6">
-                            ${options.map(opt => `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg" data-action="select-rewrite" data-text="${opt}">"${opt}"</button>`).join('')}
+                            ${options.map(opt => `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg" data-action="select-rewrite" data-text="${opt.replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
                         </div>
                         <button class="text-white/70" data-action="close-rewrite-modal">Cancel</button>
                     </div>
@@ -2624,10 +2821,9 @@
                     const newText = { original: e.currentTarget.dataset.text, translated: null };
                     performAction({ type: 'UPDATE_MANTRA_TEXT', payload: { mantraId: mantra.id, oldText: mantra.text, newText } });
                     
-                    // Trigger re-translation if needed
                     if (state.settings.language !== 'en') {
                         await translateSingleMantra(mantra.id, state.settings.language);
-                        router(); // Re-render with new translation
+                        router();
                     }
                     closeModal();
                 });
@@ -2648,19 +2844,23 @@
         const proofreadBtn = document.getElementById('proofread-mantra-btn');
         proofreadBtn.disabled = true;
         proofreadBtn.innerHTML = `<span class="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin inline-block"></span>`;
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.proofreader;
 
         try {
-            const proofreader = await window.ai.proofreader.create();
-            const { correctedText } = await proofreader.proofread(text);
+            const { correctedText } = isDemo
+                ? await handleFakeAiProofread(text)
+                : await (await window.ai.proofreader.create()).proofread(text);
             
             const suggestionContainer = document.getElementById('proofread-suggestion');
-            if (correctedText.trim() !== text) {
+            const originalText = correctedText.replace(' (Simulated)', '');
+
+            if (originalText.trim() !== text) {
                 suggestionContainer.innerHTML = `
                     <span>Suggestion: <i class="font-semibold">"${correctedText}"</i></span>
-                    <button data-action="accept-proofread" data-suggestion="${correctedText}" class="ml-2 px-2 py-0.5 text-xs rounded-full bg-teal text-white">Accept</button>`;
+                    <button data-action="accept-proofread" data-suggestion="${originalText}" class="ml-2 px-2 py-0.5 text-xs rounded-full bg-teal text-white">Accept</button>`;
                 suggestionContainer.classList.remove('hidden');
             } else {
-                suggestionContainer.innerHTML = `<span>${ICONS.Check({size: 16, className: 'inline'})} Looks good!</span>`;
+                suggestionContainer.innerHTML = `<span>${ICONS.Check({size: 16, className: 'inline'})} Looks good! ${isDemo ? '(Simulated)' : ''}</span>`;
                 suggestionContainer.classList.remove('hidden');
                 setTimeout(() => suggestionContainer.classList.add('hidden'), 2000);
             }
@@ -2698,6 +2898,15 @@
             router();
             return;
         }
+        
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
+        if (isDemo) {
+            renderLoadingModal(`Simulating translation to ${SUPPORTED_LANGUAGES[newLang]}...`);
+            await handleFakeLanguageChange(newLang);
+            closeLoadingModal();
+            router();
+            return;
+        }
 
         renderLoadingModal(`Translating to ${SUPPORTED_LANGUAGES[newLang]}...`);
         
@@ -2731,7 +2940,7 @@
     }
 
     async function initAiFeatures() {
-        if (!isAiSupported) return;
+        await checkAiStatus();
         
         if (state.settings.language === 'auto') {
             const lang = navigator.language.split('-')[0];
@@ -2743,7 +2952,6 @@
         }
 
         if (state.settings.language !== 'en' && state.settings.aiFeatures.enabled) {
-            // Check if mantras are already translated
             const needsTranslation = CURATED_MANTRAS.some(m => !m.text.translated);
             if(needsTranslation) {
                 await handleLanguageChange(state.settings.language);
@@ -2780,8 +2988,9 @@
         if (!isAudioSupported) {
             state.settings.voiceFeatures.enabled = false;
         }
-        router();
-        initAiFeatures();
+        initAiFeatures().then(() => {
+            router();
+        });
     });
 
   </script>
