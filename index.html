@@ -615,12 +615,12 @@
         state.currentMantraIndex = newIndex;
         renderTransitionParticles();
 
+        // Re-introducing a setTimeout to allow for a fade-out animation and to resolve
+        // potential browser rendering issues, mirroring the working logic in handleSwipe.
         const mantraText = document.getElementById('mantra-text');
         if (mantraText) {
             mantraText.style.opacity = '0';
-            setTimeout(() => {
-                renderDashboard();
-            }, 150);
+            setTimeout(renderDashboard, 150);
         } else {
             renderDashboard();
         }
@@ -1549,6 +1549,7 @@
                     </div>`;
             }
             const canProofread = state.settings.aiFeatures.enabled && (state.aiStatus.proofreader || state.settings.demoMode.enabled);
+            const canSuggest = state.settings.aiFeatures.enabled && (state.aiStatus.text || state.settings.demoMode.enabled);
             content += `
                 <div class="mt-6 border-t border-white/20 pt-4">
                     <h3 class="text-lg font-semibold text-center mb-3">Create Your Own Mantra</h3>
@@ -1556,6 +1557,7 @@
                         <textarea id="new-custom-mantra-text" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white resize-none" placeholder="e.g., I am resilient and strong." maxlength="150" rows="3"></textarea>
                         <div id="new-mantra-char-count" class="text-right text-xs text-white/60">0/150</div>
                         <div id="proofread-suggestion" class="hidden text-sm p-2 bg-teal/20 rounded-lg text-left"></div>
+                        <div id="ai-suggestion-container" class="space-y-2"></div>
                         <select id="new-custom-mantra-category" class="w-full p-3 bg-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white">
                             ${CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                         </select>
@@ -1565,8 +1567,9 @@
                             <option value="Low">Low Priority</option>
                         </select>
                         <div class="flex gap-2">
-                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50" disabled>${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Check Grammar</button>` : ''}
-                            ${renderButton('Add Custom Mantra', { variant: 'secondary', additionalClasses: 'flex-1', attributes: 'data-action="add-new-custom-mantra" id="add-custom-mantra-btn" disabled' })}
+                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled>${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
+                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled>${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
+                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-white/20 text-white hover:bg-white/30 focus:ring-white flex items-center justify-center gap-2" disabled>${ICONS.Plus({size: 20})}<span>Add</span></button>
                         </div>
                     </div>
                 </div>
@@ -2226,12 +2229,14 @@
             const charCountEl = document.getElementById('new-mantra-char-count');
             const addBtn = document.getElementById('add-custom-mantra-btn');
             const proofreadBtn = document.getElementById('proofread-mantra-btn');
-            if (charCountEl && addBtn) {
+            const suggestBtn = document.getElementById('suggest-phrasing-btn');
+            if (charCountEl) {
                 const count = target.value.length;
                 charCountEl.textContent = `${count}/150`;
                 const hasText = target.value.trim().length > 0;
-                addBtn.disabled = !hasText;
+                if(addBtn) addBtn.disabled = !hasText;
                 if(proofreadBtn) proofreadBtn.disabled = !hasText;
+                if(suggestBtn) suggestBtn.disabled = !hasText;
             }
         } else if (target.id === 'mantra-search-input') {
             const searchTerm = target.value;
@@ -2593,11 +2598,20 @@
             case 'open-ai-generate-modal': handleAiGenerate(); break;
             case 'rewrite-mantra': handleAiRewrite(mantraId); break;
             case 'proofread-mantra': handleAiProofread(); break;
+            case 'suggest-phrasing': handleAiSuggestPhrasing(); break;
             case 'accept-proofread': {
                 const textInput = document.getElementById('new-custom-mantra-text');
                 textInput.value = target.dataset.suggestion;
                 document.getElementById('proofread-suggestion').classList.add('hidden');
                 // Trigger input event to re-validate buttons
+                textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                break;
+            }
+            case 'select-suggestion': {
+                const textInput = document.getElementById('new-custom-mantra-text');
+                textInput.value = target.dataset.text;
+                document.getElementById('ai-suggestion-container').innerHTML = '';
+                // Trigger input event to re-validate buttons and char count
                 textInput.dispatchEvent(new Event('input', { bubbles: true }));
                 break;
             }
@@ -2663,6 +2677,19 @@
                     `Another take: ${originalText} (Simulated)`
                 ];
                 resolve(variants);
+            }, 800);
+        });
+    };
+
+    const handleFakeAiSuggestPhrasing = (text) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const suggestions = [
+                    `First suggestion for: ${text} (Simulated)`,
+                    `Second suggestion for: ${text} (Simulated)`,
+                    `A third way to say: ${text} (Simulated)`,
+                ];
+                resolve(JSON.stringify(suggestions));
             }, 800);
         });
     };
@@ -2870,7 +2897,51 @@
             renderToast("Proofread failed. Please try again.", false);
         } finally {
             proofreadBtn.disabled = false;
-            proofreadBtn.innerHTML = `${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Check Grammar`;
+            proofreadBtn.innerHTML = `${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Grammar`;
+        }
+    }
+
+    async function handleAiSuggestPhrasing() {
+        const textInput = document.getElementById('new-custom-mantra-text');
+        const text = textInput.value.trim();
+        if (!text) return;
+
+        const suggestBtn = document.getElementById('suggest-phrasing-btn');
+        const suggestionContainer = document.getElementById('ai-suggestion-container');
+        
+        suggestBtn.disabled = true;
+        suggestBtn.innerHTML = `<span class="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin inline-block"></span>`;
+        suggestionContainer.innerHTML = ''; // Clear previous suggestions
+
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
+
+        try {
+            const result = isDemo
+                ? await handleFakeAiSuggestPhrasing(text)
+                : await (await getAiTextSession()).prompt(`Generate 3 alternative phrasings for the positive affirmation: "${text}". Keep them concise and empowering. Return the result as a JSON array of strings.`);
+
+            const suggestions = JSON.parse(result);
+            
+            if (suggestions && suggestions.length > 0) {
+                const suggestionHTML = suggestions.map(s => {
+                    const cleanText = s.replace(' (Simulated)', '');
+                    return `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm" data-action="select-suggestion" data-text="${cleanText}">"${s}"</button>`;
+                }).join('');
+                
+                suggestionContainer.innerHTML = `
+                    <h4 class="text-sm font-semibold text-white/80">Suggestions${isDemo ? ' (Simulated)' : ''}:</h4>
+                    ${suggestionHTML}
+                `;
+            } else {
+                suggestionContainer.innerHTML = `<p class="text-sm text-white/60">No suggestions found. Try a different phrasing.</p>`;
+            }
+
+        } catch (error) {
+            console.error("AI Suggestion failed:", error);
+            suggestionContainer.innerHTML = `<p class="text-sm text-rose-400">Could not get suggestions at this time.</p>`;
+        } finally {
+            suggestBtn.disabled = false;
+            suggestBtn.innerHTML = `${ICONS.Wand2({size:20, className:'inline-block mr-2'})}Suggest`;
         }
     }
     

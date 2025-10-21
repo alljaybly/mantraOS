@@ -33,6 +33,7 @@ Built as a self-contained, **zero-dependency vanilla JavaScript application**, i
 
 - [Live Demo](#-live-demo)
 - [Screenshots](#-screenshots)
+- [Chrome AI Integration](#-chrome-ai-integration)
 - [Key Features](#-key-features)
 - [How It Works](#-how-it-works)
 - [Technology Stack](#️-technology-stack)
@@ -60,6 +61,12 @@ Built as a self-contained, **zero-dependency vanilla JavaScript application**, i
 | ![Library Screen](https://github.com/alljaybly/mantraOS/blob/main/Library.png?raw=true) | ![Settings Screen](https://github.com/alljaybly/mantraOS/blob/main/Settings.png?raw=true) |
 | *Manage your collection, now with AI generation.* | *Enable AI features and choose your language.* |
 
+## 🤖 Chrome AI Integration
+
+MantraOS is architected to leverage Chrome's on-device AI APIs for enhanced personalization. The app automatically detects AI availability and provides clear instructions for enabling these privacy-preserving features.
+
+**Current Status:** AI APIs in early preview - detection system active
+**Future Ready:** Full integration prepared for API availability
 
 ## ✨ Key Features
 
