@@ -272,7 +272,7 @@
     };
 
     // --- CONSTANTS ---
-    const CATEGORIES = ['Money', 'Health', 'Relationships', 'Career', 'Confidence'];
+    const CATEGORIES = ['Money', 'Health', 'Relationships', 'Career', 'Confidence', 'AI Generated'];
     const PRIORITIES = { Low: 'bg-sky-500', Medium: 'bg-yellow-500', High: 'bg-rose-500' };
     const PRIORITY_LEVELS = ['Low', 'Medium', 'High'];
     const CURATED_MANTRAS = [
@@ -332,6 +332,11 @@
         aiFeatures: { enabled: true },
         demoMode: { enabled: false },
         language: 'auto',
+        aiSettings: {
+            creativity: 'balanced', // focused, balanced, creative
+            tone: 'inspirational', // inspirational, assertive, gentle, calm
+            length: 'medium' // short, medium, long
+        },
     };
 
     let state = {
@@ -433,7 +438,7 @@
                 const output = { ...target };
                 if (target && typeof target === 'object' && source && typeof source === 'object') {
                     Object.keys(source).forEach(key => {
-                        if (source[key] && typeof source[key] === 'object') {
+                        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
                             if (!(key in target))
                                 Object.assign(output, { [key]: source[key] });
                             else
@@ -583,25 +588,32 @@
         document.documentElement.style.setProperty('--font-family', state.settings.font === 'font-sans' ? "'Poppins', sans-serif" : "'Playfair Display', serif");
     };
     const exportUserData = () => {
-        try {
-            const backupData = { ...state };
-            delete backupData.aiStatus; // Don't export runtime status
-            const jsonString = JSON.stringify(backupData, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            const timestamp = new Date().toISOString().slice(0, 10);
-            link.download = `mantraos_backup_${timestamp}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            alert('Data exported successfully!');
-        } catch (error) {
-            console.error('Failed to export data:', error);
-            alert('An error occurred while exporting your data.');
-        }
+        renderConfirmationModal(
+            'Export Data?',
+            'This will create a JSON backup of your mantras, settings, and progress.',
+            () => {
+                try {
+                    const backupData = { ...state };
+                    delete backupData.aiStatus; // Don't export runtime status
+                    const jsonString = JSON.stringify(backupData, null, 2);
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    const timestamp = new Date().toISOString().slice(0, 10);
+                    link.download = `mantraos_backup_${timestamp}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    renderToast('Data exported successfully!');
+                } catch (error) {
+                    console.error('Failed to export data:', error);
+                    renderModal('Export Error', 'An error occurred while exporting your data.');
+                }
+            },
+            { confirmText: 'Export' }
+        );
     };
     
     // --- SLIDESHOW LOGIC ---
@@ -1139,7 +1151,7 @@
                         ${ICONS.Layers({ size: 48, className: "mx-auto mb-4 text-teal" })}
                         <h2 class="text-3xl font-serif mb-4">Focus Your Intentions</h2>
                         <p class="text-white/80 mb-6">We'll start by selecting from key life areas to personalize your experience.</p>
-                        <div class="flex flex-wrap justify-center gap-2 mb-8">${CATEGORIES.map(cat => `<span class="bg-white/20 px-3 py-1 rounded-full text-sm">${cat}</span>`).join('')}</div>
+                        <div class="flex flex-wrap justify-center gap-2 mb-8">${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<span class="bg-white/20 px-3 py-1 rounded-full text-sm">${cat}</span>`).join('')}</div>
                         ${renderButton('Choose My Mantras', { attributes: 'data-action="nav" data-path="/onboarding/mantras"'})}
                     </div>`;
                 break;
@@ -1173,7 +1185,7 @@
                         <h2 class="text-3xl font-serif mb-2">Select 3-5 Core Mantras</h2>
                         <p class="text-white/80 mb-6">Choose affirmations that resonate with you.</p>
                         <div class="flex flex-wrap justify-center gap-2 mb-4">
-                            ${CATEGORIES.map(cat => `<button class="px-3 py-1 text-sm rounded-full transition-colors bg-white/20 text-white" data-action="filter-mantras" data-category="${cat}">${cat}</button>`).join('')}
+                            ${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<button class="px-3 py-1 text-sm rounded-full transition-colors bg-white/20 text-white" data-action="filter-mantras" data-category="${cat}">${cat}</button>`).join('')}
                         </div>
                         <div class="h-64 overflow-y-auto pr-2 space-y-3 mb-6" id="mantra-list"></div>
                         ${renderButton(`Next (${selectionCount} selected)`, { attributes: `data-action="nav" data-path="/onboarding/custom" ${isNextDisabled ? 'disabled' : ''}`})}
@@ -1190,7 +1202,7 @@
                         <div class="space-y-4 mb-8">
                             <textarea id="custom-mantra-text" placeholder="e.g., I am a creative powerhouse." class="w-full h-24 p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white"></textarea>
                             <select id="custom-mantra-category" class="w-full p-3 bg-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white">
-                                ${CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                                ${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                             </select>
                             <select id="custom-mantra-priority" class="w-full p-3 bg-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white">
                                 <option value="Medium">Medium Priority</option>
@@ -1214,7 +1226,7 @@
                 break;
         }
         root.innerHTML = `<div class="min-h-screen w-full flex flex-col items-center justify-center p-4 theme-gradient-1 text-white relative">${content}</div>`;
-        if (step === 'mantras') renderMantraSelectionList(CATEGORIES[0]);
+        if (step === 'mantras') renderMantraSelectionList(CATEGORIES.filter(c => c !== 'AI Generated')[0]);
     };
 
     function renderMantraSelectionList(category) {
@@ -1338,7 +1350,7 @@
                 </div>
             ` : '';
             
-            const canRewrite = state.settings.aiFeatures.enabled && (state.aiStatus.rewriter || state.settings.demoMode.enabled);
+            const canRewrite = isAnyAiFeatureEnabled();
             const rephraseButton = canRewrite ? `
                 <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-full" aria-label="Rephrase this mantra">
                     ${ICONS.Wand2({size: 20})}
@@ -1510,7 +1522,7 @@
                     <div class="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
                     ${sortedMantras.length > 0 ? sortedMantras.map(mantra => {
                         const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
-                        const canRewrite = state.settings.aiFeatures.enabled && (state.aiStatus.rewriter || state.settings.demoMode.enabled);
+                        const canRewrite = isAnyAiFeatureEnabled();
                         const rephraseButton = canRewrite ? `
                             <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Rephrase this mantra">
                                 ${ICONS.Wand2({ size: 16 })}
@@ -1773,6 +1785,40 @@
             </div>
         `;
 
+        const renderAiDefaultParamControls = () => {
+            const { creativity, tone, length } = s.aiSettings;
+            return `
+                 <div class="p-3 bg-black/20 rounded-lg space-y-3">
+                    <h3 class="font-semibold mb-2">Default AI Parameters</h3>
+                    <div class="flex justify-between items-center text-sm">
+                        <label for="ai-default-creativity">Creativity</label>
+                        <select id="ai-default-creativity" data-action="set-ai-setting" data-key="creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
+                            <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
+                            <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
+                        </select>
+                    </div>
+                     <div class="flex justify-between items-center text-sm">
+                        <label for="ai-default-tone">Tone</label>
+                        <select id="ai-default-tone" data-action="set-ai-setting" data-key="tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
+                            <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
+                            <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
+                            <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
+                        </select>
+                    </div>
+                     <div class="flex justify-between items-center text-sm">
+                        <label for="ai-default-length">Length</label>
+                        <select id="ai-default-length" data-action="set-ai-setting" data-key="length" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
+                            <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        }
+
         const aiFeaturesSection = `
             <div class="glass-card p-4 rounded-xl mb-4">
                 <div class="flex justify-between items-center">
@@ -1798,6 +1844,8 @@
                         <button data-action="test-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm" ${!state.aiStatus.supported ? 'disabled' : ''}>Test AI</button>
                         <button data-action="recheck-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm">Re-check Status</button>
                     </div>
+
+                    ${renderAiDefaultParamControls()}
 
                     <div class="flex justify-between items-center">
                         <label for="language-select" class="flex items-center gap-2 text-sm">${ICONS.Languages({size: 16})} Language</label>
@@ -2311,6 +2359,13 @@
         if (action === 'set-language') {
             handleLanguageChange(target.value);
         }
+        
+        if (action === 'set-ai-setting') {
+            const key = `aiSettings.${target.dataset.key}`;
+            const oldValue = getNestedValue(state.settings, key);
+            const newValue = target.value;
+            performAction({ type: 'UPDATE_SETTING', payload: { key, oldValue, newValue } });
+        }
     });
 
     document.addEventListener('click', async e => {
@@ -2653,30 +2708,30 @@
     });
     
     // --- FAKE AI (DEMO MODE) HANDLERS ---
-    const handleFakeAiGenerate = (topic) => {
+    const handleFakeAiGenerate = (topic, options) => {
         return new Promise(resolve => {
             setTimeout(() => {
                 const fakeMantras = [
-                    `I am confident and capable in ${topic}. (Simulated)`,
-                    `I attract positive ${topic} into my life. (Simulated)`,
-                    `My connection to ${topic} grows stronger every day. (Simulated)`,
-                    `I am worthy of all the good ${topic} brings. (Simulated)`,
-                    `I embrace ${topic} with an open heart. (Simulated)`
-                ];
+                    `[${options.tone}] A ${options.length} mantra about ${topic}. (Simulated)`,
+                    `[${options.tone}] Another ${options.length} mantra for ${topic}. (Simulated)`,
+                    `[${options.tone}] This is a ${options.length} ${topic} mantra. (Simulated)`,
+                    `[${options.tone}] My final ${options.length} mantra on ${topic}. (Simulated)`,
+                    `[${options.tone}] Your creative ${options.length} ${topic} mantra. (Simulated)`
+                ].map(m => m.replace('creative', options.creativity));
                 resolve(JSON.stringify(fakeMantras));
             }, 800);
         });
     };
 
-    const handleFakeAiRewrite = (originalText) => {
+    const handleFakeAiRewrite = (originalText, options) => {
         return new Promise(resolve => {
             setTimeout(() => {
                 const variants = [
-                    `Rephrased: ${originalText} (Simulated)`,
-                    `Alternative: ${originalText} (Simulated)`,
-                    `Another take: ${originalText} (Simulated)`
+                    `[${options.tone}] Rephrased with ${options.creativity} creativity: ${originalText} (Simulated)`,
+                    `[${options.tone}] Alternative take using ${options.creativity}: ${originalText} (Simulated)`,
+                    `[${options.tone}] A final ${options.creativity} version: ${originalText} (Simulated)`
                 ];
-                resolve(variants);
+                resolve(JSON.stringify(variants));
             }, 800);
         });
     };
@@ -2732,12 +2787,46 @@
 
     async function handleAiGenerate() {
         const modalId = 'ai-generate-modal';
+        const { creativity, tone, length } = state.settings.aiSettings;
+
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up" id="ai-generate-content">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 text-center animate-slide-in-up" id="ai-generate-content">
                     <h2 class="text-2xl font-serif mb-4">Generate Mantras</h2>
                     <p class="text-white/80 mb-6">What area of your life would you like to focus on?</p>
                     <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white mb-4">
+                    
+                    <details class="text-left mb-4">
+                        <summary class="cursor-pointer text-sm font-semibold text-white/80">Advanced Options</summary>
+                        <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
+                             <div class="flex justify-between items-center text-sm">
+                                <label for="ai-generate-creativity">Creativity</label>
+                                <select id="ai-generate-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                    <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
+                                    <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
+                                    <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <label for="ai-generate-tone">Tone</label>
+                                <select id="ai-generate-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                    <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
+                                    <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
+                                    <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
+                                    <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <label for="ai-generate-length">Length</label>
+                                <select id="ai-generate-length" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                    <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
+                                    <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
+                                    <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+
                     ${renderButton('Generate', { attributes: 'id="ai-generate-submit"' })}
                 </div>
             </div>`;
@@ -2752,6 +2841,15 @@
         submitBtn.addEventListener('click', async () => {
             const topic = document.getElementById('ai-topic-input').value.trim();
             if (!topic) return;
+            
+            // Get selected options
+            const newCreativity = document.getElementById('ai-generate-creativity').value;
+            const newTone = document.getElementById('ai-generate-tone').value;
+            const newLength = document.getElementById('ai-generate-length').value;
+
+            // Save for next time
+            state.settings.aiSettings = { creativity: newCreativity, tone: newTone, length: newLength };
+            saveState();
 
             const contentContainer = document.getElementById('ai-generate-content');
             contentContainer.innerHTML = `
@@ -2761,9 +2859,14 @@
             const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
             
             try {
+                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
+                const temperature = creativityMap[newCreativity] || 0.7;
+                
+                const prompt = `Generate 5 positive affirmations about "${topic}". They should have a ${newTone} tone and be ${newLength}. Return the result as a JSON array of strings.`;
+                
                 const result = isDemo 
-                    ? await handleFakeAiGenerate(topic) 
-                    : await (await getAiTextSession()).prompt(`Generate 5 positive affirmations about "${topic}". They should be personal, empowering, and concise. Return the result as a JSON array of strings.`);
+                    ? await handleFakeAiGenerate(topic, { creativity: newCreativity, tone: newTone, length: newLength }) 
+                    : await (await getAiTextSession()).prompt(prompt, { temperature });
                 
                 const mantras = JSON.parse(result);
                 
@@ -2777,7 +2880,7 @@
                     ${mantras.map((mantra, index) => `
                         <div class="glass-card p-3 flex justify-between items-center">
                             <p>"${mantra}"</p>
-                            <button data-action="add-ai-mantra" data-text="${mantra.replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30">${ICONS.Plus({size: 16})}</button>
+                            <button data-action="add-ai-mantra" data-text="${String(mantra).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30">${ICONS.Plus({size: 16})}</button>
                         </div>`).join('')}
                     </div>
                     ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
@@ -2806,61 +2909,105 @@
         const mantra = state.userMantras.find(m => m.id === mantraId);
         if (!mantra) return;
 
-        renderLoadingModal("Rephrasing your mantra...");
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.rewriter;
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
+        const modalId = 'ai-rewrite-modal';
+        const { creativity, tone } = state.settings.aiSettings;
 
-        try {
-            let options = [];
-            if (isDemo) {
-                options = await handleFakeAiRewrite(mantra.text.original);
-            } else {
-                const rewriter = await window.ai.rewriter.create();
-                const iterator = await rewriter.rephrase(mantra.text.original, { numVariants: 3 });
-                for await (const response of iterator) {
-                  options.push(response);
-                }
-            }
-            closeLoadingModal();
+        const modalTitle = isDemo 
+            ? `Rephrase Mantra <span class="text-sm text-teal-300">(Simulated)</span>` 
+            : 'Rephrase Mantra';
 
-            const modalId = 'ai-rewrite-modal';
-            const modalTitle = isDemo 
-                ? `Choose a New Phrasing <span class="text-sm text-teal-300">(Simulated)</span>` 
-                : 'Choose a New Phrasing';
-
-            const modalHTML = `
-                <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                    <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up">
-                        <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                        <div class="space-y-3 mb-6">
-                            ${options.map(opt => `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg" data-action="select-rewrite" data-text="${opt.replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up" id="ai-rewrite-content">
+                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
+                    <p class="text-white/70 italic mb-4">"${mantra.text.original}"</p>
+                    <div class="text-left mb-4 p-3 bg-black/20 rounded-lg space-y-3">
+                         <div class="flex justify-between items-center text-sm">
+                            <label for="ai-rewrite-creativity">Creativity</label>
+                            <select id="ai-rewrite-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
+                                <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
+                                <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
+                            </select>
                         </div>
-                        <button class="text-white/70" data-action="close-rewrite-modal">Cancel</button>
+                        <div class="flex justify-between items-center text-sm">
+                            <label for="ai-rewrite-tone">Tone</label>
+                            <select id="ai-rewrite-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
+                                <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
+                                <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
+                                <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
+                            </select>
+                        </div>
                     </div>
-                </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            
-            const modal = document.getElementById(modalId);
-            const closeModal = () => modal?.remove();
-            modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-            modal.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
-            modal.querySelectorAll('[data-action="select-rewrite"]').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const newText = { original: e.currentTarget.dataset.text, translated: null };
-                    performAction({ type: 'UPDATE_MANTRA_TEXT', payload: { mantraId: mantra.id, oldText: mantra.text, newText } });
-                    
-                    if (state.settings.language !== 'en') {
-                        await translateSingleMantra(mantra.id, state.settings.language);
-                        router();
-                    }
-                    closeModal();
-                });
-            });
+                    ${renderButton('Rephrase', { attributes: 'id="ai-rewrite-submit"'})}
+                    <button class="text-white/70 block w-full text-center mt-3" data-action="close-rewrite-modal">Cancel</button>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        const modal = document.getElementById(modalId);
+        const closeModal = () => modal?.remove();
+        modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+        modal.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
+        
+        modal.querySelector('#ai-rewrite-submit').addEventListener('click', async () => {
+            const contentContainer = document.getElementById('ai-rewrite-content');
+            contentContainer.innerHTML = `
+                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-white/80">Rephrasing your mantra...</p>`;
 
-        } catch (error) {
-            closeLoadingModal();
-            console.error("AI Rewrite failed:", error);
-            renderModal("Rewrite Failed", "The AI could not rewrite this mantra. Please try again later.");
-        }
+            const newCreativity = document.getElementById('ai-rewrite-creativity').value;
+            const newTone = document.getElementById('ai-rewrite-tone').value;
+
+            // Save for next time
+            state.settings.aiSettings.creativity = newCreativity;
+            state.settings.aiSettings.tone = newTone;
+            saveState();
+
+            try {
+                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
+                const temperature = creativityMap[newCreativity] || 0.7;
+
+                const prompt = `Rephrase the following mantra in 3 different ways with a ${newTone} tone: "${mantra.text.original}". Return the result as a JSON array of strings.`;
+                
+                const result = isDemo
+                    ? await handleFakeAiRewrite(mantra.text.original, { creativity: newCreativity, tone: newTone })
+                    : await (await getAiTextSession()).prompt(prompt, { temperature });
+                
+                const options = JSON.parse(result);
+
+                contentContainer.innerHTML = `
+                    <h2 class="text-2xl font-serif mb-4">Choose a New Phrasing</h2>
+                    <div class="space-y-3 mb-6">
+                        ${options.map(opt => `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg" data-action="select-rewrite" data-text="${String(opt).replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
+                    </div>
+                    <button class="text-white/70" data-action="close-rewrite-modal">Cancel</button>`;
+                
+                contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
+                contentContainer.querySelectorAll('[data-action="select-rewrite"]').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const newText = { original: e.currentTarget.dataset.text, translated: null };
+                        performAction({ type: 'UPDATE_MANTRA_TEXT', payload: { mantraId: mantra.id, oldText: mantra.text, newText } });
+                        
+                        if (state.settings.language !== 'en') {
+                            await translateSingleMantra(mantra.id, state.settings.language);
+                            router();
+                        }
+                        closeModal();
+                    });
+                });
+
+            } catch (error) {
+                console.error("AI Rewrite failed:", error);
+                contentContainer.innerHTML = `
+                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Rewrite Failed</h2>
+                    <p class="text-white/80 mb-6">The AI could not rewrite this mantra. Please try again later.</p>
+                    ${renderButton('Close', { attributes: 'data-action="close-rewrite-modal"' })}`;
+                contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
+            }
+        });
     }
 
     async function handleAiProofread() {
@@ -2924,7 +3071,7 @@
             
             if (suggestions && suggestions.length > 0) {
                 const suggestionHTML = suggestions.map(s => {
-                    const cleanText = s.replace(' (Simulated)', '');
+                    const cleanText = String(s).replace(' (Simulated)', '');
                     return `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm" data-action="select-suggestion" data-text="${cleanText}">"${s}"</button>`;
                 }).join('');
                 
