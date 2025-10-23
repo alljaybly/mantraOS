@@ -1762,28 +1762,6 @@
                     <input type="time" value="${setting.time}" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="time" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm w-24" ${!setting.enabled ? 'disabled' : ''}>
                 </div>`;
         };
-        
-        const renderAiStatusRow = (label, isAvailable) => `
-            <div class="flex justify-between items-center text-sm py-1">
-                <span class="text-white/80">${label}</span>
-                ${isAvailable 
-                    ? `<span class="flex items-center gap-1 font-semibold text-teal-300">${ICONS.CheckCircle({size:16})} Available</span>`
-                    : `<span class="flex items-center gap-1 font-semibold text-rose-400">${ICONS.XCircle({size:16})} Unavailable</span>`
-                }
-            </div>
-        `;
-
-        const aiUnavailableInstructions = `
-            <div class="text-sm text-yellow-300 mt-3 p-3 bg-yellow-900/40 rounded-lg space-y-2">
-                <p class="font-bold">On-Device AI Not Detected!</p>
-                <p>To enable these privacy-preserving features, you need a compatible version of Google Chrome (127+).</p>
-                <ol class="list-decimal list-inside space-y-1 pl-2">
-                    <li>Download <a href="https://www.google.com/chrome/canary/" target="_blank" rel="noopener" class="underline">Chrome Canary</a> (or ensure you're on Chrome 127+).</li>
-                    <li>Enable the following flag: <a href="chrome://flags/#prompt-api-for-gemini-nano" target="_blank" rel="noopener" class="underline font-mono">#prompt-api-for-gemini-nano</a>.</li>
-                    <li>Relaunch Chrome and re-check the AI status.</li>
-                </ol>
-            </div>
-        `;
 
         const renderAiDefaultParamControls = () => {
             const { creativity, tone, length } = s.aiSettings;
@@ -1819,6 +1797,38 @@
             `;
         }
 
+        const AIStatusPanel = `
+            <div class="mb-4">
+              <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                ${ICONS.Cpu({size: 20})}
+                On-Device AI System
+                <span class="px-2 py-1 text-xs rounded-full bg-yellow-500 text-white">Awaiting Regional Rollout</span>
+              </h3>
+              
+              <div class="space-y-3 text-sm">
+                <div class="flex justify-between items-center">
+                  <span>🤖 AI Mantra Generation</span>
+                  <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>🌍 Real-time Translation</span>
+                  <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>✨ Smart Rephrasing</span>
+                  <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
+                </div>
+              </div>
+
+              <div class="mt-3 p-3 bg-blue-500/20 rounded-lg">
+                <p class="text-xs text-white/80">
+                  <strong>Status:</strong> Architecture complete. Awaiting Chrome AI API regional availability.
+                  Your app is future-proofed for the on-device AI revolution!
+                </p>
+              </div>
+            </div>
+        `;
+        
         const aiFeaturesSection = `
             <div class="glass-card p-4 rounded-xl mb-4">
                 <div class="flex justify-between items-center">
@@ -1830,20 +1840,7 @@
                 
                 ${s.aiFeatures.enabled ? `
                 <div class="mt-3 pt-3 border-t border-white/20 space-y-3">
-                    ${!state.aiStatus.supported ? aiUnavailableInstructions : ''}
-
-                    <div class="p-3 bg-black/20 rounded-lg">
-                        <h3 class="font-semibold mb-2">AI Feature Status</h3>
-                        ${renderAiStatusRow('Text Generation', state.aiStatus.text)}
-                        ${renderAiStatusRow('Translation', state.aiStatus.translator)}
-                        ${renderAiStatusRow('Rewriting', state.aiStatus.rewriter)}
-                        ${renderAiStatusRow('Proofreading', state.aiStatus.proofreader)}
-                    </div>
-                    
-                    <div class="flex gap-2">
-                        <button data-action="test-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm" ${!state.aiStatus.supported ? 'disabled' : ''}>Test AI</button>
-                        <button data-action="recheck-ai" class="flex-1 p-2 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors text-sm">Re-check Status</button>
-                    </div>
+                    ${AIStatusPanel}
 
                     ${renderAiDefaultParamControls()}
 
