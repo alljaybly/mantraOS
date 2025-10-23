@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MantraOS</title>
   
-  <!-- Tailwind CSS -->
+  <!-- For production, it's recommended to process Tailwind CSS via a build step to purge unused styles and improve performance. -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Google Fonts -->
@@ -16,6 +16,7 @@
   <!-- PWA Manifest & Themeing -->
   <meta name="theme-color" content="#667eea">
   <link rel="manifest" href="manifest.json">
+  <!-- The icon path is root-relative. If you see a 404, ensure your local server is configured to serve from the project root. -->
   <link rel="apple-touch-icon" href="/icon-192.svg">
 
 
@@ -236,7 +237,8 @@
             text: false,
             translator: false,
             rewriter: false,
-            proofreader: false
+            proofreader: false,
+            assistant: false
         };
 
         if (status.supported) {
@@ -264,6 +266,15 @@
                 status.proofreader = true;
                 console.log('[MantraOS AI Diagnostics] proofreader.create: Available');
             } catch (e) { console.log('[MantraOS AI Diagnostics] proofreader.create: Unavailable', e.message); }
+
+            try {
+                if (window.ai.assistant && await window.ai.assistant.canPrompt({audio: true})) {
+                    status.assistant = true;
+                    console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Available');
+                } else {
+                     console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Unavailable');
+                }
+            } catch (e) { console.log('[MantraOS AI Diagnostics] assistant.canPrompt: Unavailable', e.message); }
         } else {
             console.log('[MantraOS AI Diagnostics] window.ai object not found. AI features are unavailable.');
         }
@@ -291,6 +302,7 @@
         { id: 'first_view', title: 'First Step', description: 'View your first mantra.', unlocked: false }, { id: '7_day_streak', title: 'Consistent Mind', description: 'View mantras for 7 days in a row.', unlocked: false }, { id: '3_mantras', title: 'Trio of Power', description: 'Select at least 3 mantras.', unlocked: false }, { id: 'custom_mantra', title: 'Your Own Voice', description: 'Create your first custom mantra.', unlocked: false }, { id: '100_views', title: 'Mantra Master', description: 'View mantras 100 times in total.', unlocked: false },
     ];
     const MAX_RECORDING_SECONDS = 30;
+    const MAX_AI_RECORDING_SECONDS = 10;
 
     // --- AUDIO & BROWSER SUPPORT ---
     const isAudioSupported = !!(navigator.mediaDevices && window.MediaRecorder);
@@ -302,6 +314,12 @@
     const audioPlayer = new Audio();
     let currentlyPlayingMantraId = null;
     let audioContext;
+
+    // AI Audio Recording Globals
+    let aiTopicRecorder = null;
+    let aiTopicChunks = [];
+    let aiTopicRecordingTimer = null;
+    let aiTopicRecordingInterval = null;
 
 
     // --- STATE MANAGEMENT ---
@@ -358,7 +376,8 @@
           text: false,
           translator: false,
           rewriter: false,
-          proofreader: false
+          proofreader: false,
+          assistant: false,
       },
     };
 
@@ -1811,36 +1830,36 @@
         }
 
         const AIStatusPanel = `
-<div class="glass-card p-4 rounded-xl mb-4">
-  <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-    ${ICONS.Cpu({size: 20})}
-    On-Device AI System
-    <span class="px-2 py-1 text-xs rounded-full bg-yellow-500 text-white">Awaiting Regional Rollout</span>
-  </h3>
-  
-  <div class="space-y-3 text-sm">
-    <div class="flex justify-between items-center">
-      <span>🤖 AI Mantra Generation</span>
-      <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
-    </div>
-    <div class="flex justify-between items-center">
-      <span>🌍 Real-time Translation</span>
-      <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
-    </div>
-    <div class="flex justify-between items-center">
-      <span>✨ Smart Rephrasing</span>
-      <span class="px-2 py-1 rounded-full bg-gray-500 text-white text-xs">Ready - Awaiting API</span>
-    </div>
-  </div>
+            <div class="glass-card p-4 rounded-xl mb-4">
+              <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                ${ICONS.Cpu({size: 20})}
+                On-Device AI System
+                ${!state.aiStatus.supported ? `<span class="px-2 py-1 text-xs rounded-full bg-rose-500 text-white">Unavailable</span>` : ''}
+              </h3>
+              
+              <div class="space-y-3 text-sm">
+                ${Object.entries({
+                    '🤖 AI Mantra Generation': state.aiStatus.text,
+                    '🌍 Real-time Translation': state.aiStatus.translator,
+                    '✨ Smart Rephrasing': state.aiStatus.rewriter,
+                    '✍️ Grammar Check': state.aiStatus.proofreader,
+                    '🎤 Multimodal Audio Input': state.aiStatus.assistant,
+                }).map(([label, isAvailable]) => `
+                <div class="flex justify-between items-center">
+                  <span>${label}</span>
+                  <span class="px-2 py-1 rounded-full ${isAvailable ? 'bg-teal' : 'bg-gray-500'} text-white text-xs">${isAvailable ? 'Available' : 'Unavailable'}</span>
+                </div>
+                `).join('')}
+              </div>
 
-  <div class="mt-3 p-3 bg-blue-500/20 rounded-lg">
-    <p class="text-xs text-white/80">
-      <strong>Status:</strong> Architecture complete. Awaiting Chrome AI API regional availability.
-      Your app is future-proofed for the on-device AI revolution!
-    </p>
-  </div>
-</div>
-`;
+              <div class="mt-3 p-3 bg-blue-500/20 rounded-lg">
+                <p class="text-xs text-white/80">
+                  <strong>Status:</strong> ${state.aiStatus.supported ? 'On-device AI detected.' : 'On-device AI not detected in your browser.'}
+                  ${!state.aiStatus.supported ? ' Enable demo mode to simulate these features.' : ''}
+                </p>
+              </div>
+            </div>
+        `;
         
         const aiFeaturesSection = `
             <div class="glass-card p-4 rounded-xl mb-4">
@@ -2832,18 +2851,183 @@
         }
     }
 
+    const stopAiTopicRecording = () => {
+        if (aiTopicRecorder && aiTopicRecorder.state === 'recording') {
+            aiTopicRecorder.stop();
+        }
+        clearTimeout(aiTopicRecordingTimer);
+        clearInterval(aiTopicRecordingInterval);
+    };
+
+    const processAiAudio = async (audioBlob) => {
+        const contentContainer = document.getElementById('ai-generate-content');
+        if (!contentContainer) return;
+
+        contentContainer.innerHTML = `
+            <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-white/80">Analyzing audio and generating mantras...</p>`;
+
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.assistant;
+        
+        try {
+            let result;
+            if (isDemo) {
+                result = await handleFakeAiGenerate("a spoken topic", state.settings.aiSettings);
+            } else {
+                const promptResult = await window.ai.assistant.prompt([
+                    { text: 'Transcribe this audio and generate 5 positive affirmations about the spoken topic. The topic might be abstract. The output must be only a valid JSON array of strings, with no other text or markdown.' },
+                    { audio: audioBlob }
+                ]);
+                result = promptResult.text();
+            }
+            displayGeneratedMantras(result, isDemo);
+        } catch (error) {
+            console.error("AI Audio Processing failed:", error);
+            displayGeneratedMantras(null, isDemo, true); // Pass error flag
+        }
+    };
+
+    const startAiTopicRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            const contentContainer = document.getElementById('ai-generate-content');
+            if (!contentContainer) { // Modal was closed
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
+
+            contentContainer.innerHTML = `
+                <h2 class="text-2xl font-serif mb-4">Recording Topic...</h2>
+                <div class="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
+                    <div class="relative flex items-center justify-center w-20 h-20">
+                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
+                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
+                        <button id="ai-stop-recording-btn" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg" aria-label="Stop recording">
+                            ${ICONS.StopCircle({size: 24})}
+                        </button>
+                    </div>
+                    <div id="ai-audio-timer" class="text-lg font-mono text-white/80 font-semibold">${MAX_AI_RECORDING_SECONDS}s left</div>
+                </div>
+            `;
+            document.getElementById('ai-stop-recording-btn').addEventListener('click', stopAiTopicRecording);
+
+            aiTopicChunks = [];
+            aiTopicRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+            
+            aiTopicRecorder.ondataavailable = event => aiTopicChunks.push(event.data);
+            aiTopicRecorder.onstop = () => {
+                const audioBlob = new Blob(aiTopicChunks, { type: 'audio/webm;codecs=opus' });
+                processAiAudio(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            aiTopicRecorder.start();
+
+            aiTopicRecordingTimer = setTimeout(stopAiTopicRecording, MAX_AI_RECORDING_SECONDS * 1000);
+            
+            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
+            const timerEl = document.getElementById(`ai-audio-timer`);
+            if(timerEl) timerEl.textContent = `${secondsRemaining}s left`;
+
+            aiTopicRecordingInterval = setInterval(() => {
+                secondsRemaining--;
+                const timerEl = document.getElementById(`ai-audio-timer`);
+                if (timerEl) timerEl.textContent = `${secondsRemaining}s left`;
+                if (secondsRemaining <= 0) clearInterval(aiTopicRecordingInterval);
+            }, 1000);
+
+        } catch (err) {
+            console.error("Error accessing microphone for AI topic:", err);
+            const contentContainer = document.getElementById('ai-generate-content');
+            if (contentContainer) {
+                contentContainer.innerHTML = `
+                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Microphone Error</h2>
+                    <p class="text-white/80 mb-6">Could not access the microphone. Please grant permission and try again.</p>
+                    ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
+                const modalElement = document.getElementById('ai-generate-modal');
+                const closeModal = () => modalElement?.remove();
+                contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+            }
+        }
+    };
+    
+    function displayGeneratedMantras(jsonResult, isDemo, hasError = false) {
+        const contentContainer = document.getElementById('ai-generate-content');
+        if(!contentContainer) return;
+        const modalElement = document.getElementById('ai-generate-modal');
+        const closeModal = () => modalElement?.remove();
+
+        if (hasError) {
+             contentContainer.innerHTML = `
+                <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
+                <p class="text-white/80 mb-6">The AI could not process the request. Please try again later.</p>
+                ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
+            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+            return;
+        }
+
+        try {
+            const mantras = JSON.parse(jsonResult);
+            const modalTitle = isDemo 
+                ? `Generated Mantras <span class="text-sm text-teal-300">(Simulated)</span>` 
+                : 'Generated Mantras';
+            
+            contentContainer.innerHTML = `
+                <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
+                <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
+                ${mantras.map((mantra) => `
+                    <div class="glass-card p-3 flex justify-between items-center">
+                        <p>"${mantra}"</p>
+                        <button data-action="add-ai-mantra" data-text="${String(mantra).replace(/ \(Simulated\)$/, '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Add this mantra" title="Add to My Mantras">${ICONS.Plus({size: 16})}</button>
+                    </div>`).join('')}
+                </div>
+                ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
+
+            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+            contentContainer.querySelectorAll('[data-action="add-ai-mantra"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const newMantra = { id: `c-${Date.now()}`, text: { original: e.currentTarget.dataset.text, translated: null }, category: 'AI Generated', priority: 'Medium', createdAt: Date.now() };
+                    performAction({ type: 'ADD_MANTRA', payload: { mantra: newMantra }});
+                    e.currentTarget.innerHTML = ICONS.Check({size: 16});
+                    e.currentTarget.disabled = true;
+                });
+            });
+        } catch (error) {
+            console.error("AI Generation failed (parsing result):", error);
+            contentContainer.innerHTML = `
+                <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
+                <p class="text-white/80 mb-6">The AI returned an invalid response. Please try a different topic or try again later.</p>
+                ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
+            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+        }
+    }
+
+
     async function handleAiGenerate() {
         const modalId = 'ai-generate-modal';
         const { creativity, tone, length } = state.settings.aiSettings;
+        const canRecord = state.aiStatus.assistant || (state.settings.demoMode.enabled && !state.aiStatus.assistant);
 
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                <div class="glass-card w-full max-w-md rounded-2xl p-6 text-center animate-slide-in-up" id="ai-generate-content">
-                    <h2 class="text-2xl font-serif mb-4">Generate Mantras</h2>
-                    <p class="text-white/80 mb-6">What area of your life would you like to focus on?</p>
-                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white mb-4">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up" id="ai-generate-content">
+                    <h2 class="text-2xl font-serif mb-4 text-center">Generate Mantras</h2>
+                    <p class="text-white/80 mb-4 text-center">What area of your life would you like to focus on?</p>
+                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white">
                     
-                    <details class="text-left mb-4">
+                    <div class="my-4 flex items-center gap-2">
+                        <hr class="flex-grow border-white/20">
+                        <span class="text-xs text-white/60">OR</span>
+                        <hr class="flex-grow border-white/20">
+                    </div>
+                    <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} class="w-full flex items-center justify-center gap-2 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        ${ICONS.Microphone({size: 20})}
+                        <span>Record Topic</span>
+                    </button>
+                    ${!canRecord ? '<p class="text-xs text-center text-yellow-300 mt-2">Multimodal audio input is not available in your browser.</p>' : ''}
+
+                    <details class="text-left mt-6">
                         <summary class="cursor-pointer text-sm font-semibold text-white/80">Advanced Options</summary>
                         <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
                              <div class="flex justify-between items-center text-sm">
@@ -2873,28 +3057,30 @@
                             </div>
                         </div>
                     </details>
-
-                    ${renderButton('Generate', { attributes: 'id="ai-generate-submit"' })}
+                    <div class="mt-6 text-center">
+                        ${renderButton('Generate from Text', { attributes: 'id="ai-generate-submit"' })}
+                    </div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
 
         const modalElement = document.getElementById(modalId);
         const submitBtn = document.getElementById('ai-generate-submit');
+        const recordBtn = document.getElementById('ai-record-topic');
         
         const closeModal = () => modalElement?.remove();
         modalElement.addEventListener('click', (e) => { if(e.target === modalElement) closeModal(); });
+
+        recordBtn.addEventListener('click', startAiTopicRecording);
 
         submitBtn.addEventListener('click', async () => {
             const topic = document.getElementById('ai-topic-input').value.trim();
             if (!topic) return;
             
-            // Get selected options
             const newCreativity = document.getElementById('ai-generate-creativity').value;
             const newTone = document.getElementById('ai-generate-tone').value;
             const newLength = document.getElementById('ai-generate-length').value;
 
-            // Save for next time
             state.settings.aiSettings = { creativity: newCreativity, tone: newTone, length: newLength };
             saveState();
 
@@ -2915,39 +3101,11 @@
                     ? await handleFakeAiGenerate(topic, { creativity: newCreativity, tone: newTone, length: newLength }) 
                     : await (await getAiTextSession()).prompt(prompt, { temperature });
                 
-                const mantras = JSON.parse(result);
-                
-                const modalTitle = isDemo 
-                    ? `Generated Mantras <span class="text-sm text-teal-300">(Simulated)</span>` 
-                    : 'Generated Mantras';
-                
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                    <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
-                    ${mantras.map((mantra, index) => `
-                        <div class="glass-card p-3 flex justify-between items-center">
-                            <p>"${mantra}"</p>
-                            <button data-action="add-ai-mantra" data-text="${String(mantra).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Add this mantra" title="Add to My Mantras">${ICONS.Plus({size: 16})}</button>
-                        </div>`).join('')}
-                    </div>
-                    ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
+                displayGeneratedMantras(result, isDemo);
 
-                contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
-                contentContainer.querySelectorAll('[data-action="add-ai-mantra"]').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const newMantra = { id: `c-${Date.now()}`, text: { original: e.currentTarget.dataset.text, translated: null }, category: 'AI Generated', priority: 'Medium', createdAt: Date.now() };
-                        performAction({ type: 'ADD_MANTRA', payload: { mantra: newMantra }});
-                        e.currentTarget.innerHTML = ICONS.Check({size: 16});
-                        e.currentTarget.disabled = true;
-                    });
-                });
             } catch (error) {
                 console.error("AI Generation failed:", error);
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                    <p class="text-white/80 mb-6">The AI could not generate mantras for this topic. Please try a different topic or try again later.</p>
-                    ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
-                contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+                displayGeneratedMantras(null, isDemo, true);
             }
         });
     }
