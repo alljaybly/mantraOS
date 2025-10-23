@@ -2776,7 +2776,9 @@
     const handleFakeLanguageChange = async (newLang) => {
         const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
         allMantras.forEach(mantra => {
-            mantra.text.translated = `[${newLang}] ${mantra.text.original} (Simulated)`;
+            if (mantra.text && mantra.text.original) {
+                mantra.text.translated = `[${newLang}] ${mantra.text.original} (Simulated)`;
+            }
         });
         saveState();
     };
