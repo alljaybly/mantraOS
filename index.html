@@ -2560,9 +2560,21 @@
                 const type = target.dataset.type;
                 const period = target.dataset.period;
                 const prop = target.dataset.prop;
-                const path = type === 'affirmation' ? `notifications.affirmation.${prop}` : `notifications.mantras${period ? `.${period}` : ''}.${prop}`;
+                const path = type === 'affirmation' 
+                    ? `notifications.affirmation.${prop}` 
+                    : `notifications.mantras${period ? `.${period}` : ''}.${prop}`;
+                
                 const oldValue = getNestedValue(state.settings, path);
-                const newValue = target.type === 'checkbox' ? target.checked : target.value;
+                let newValue;
+
+                if (target.tagName.toLowerCase() === 'button') {
+                    newValue = !oldValue;
+                } else if (target.type === 'checkbox') {
+                    newValue = target.checked;
+                } else {
+                    newValue = target.value;
+                }
+
                 if(oldValue !== newValue) {
                      performAction({ type: 'UPDATE_SETTING', payload: { key: path, oldValue, newValue } });
                 }
@@ -2990,6 +3002,7 @@
                         
                         if (state.settings.language !== 'en') {
                             await translateSingleMantra(mantra.id, state.settings.language);
+                            saveState();
                             router();
                         }
                         closeModal();
@@ -3090,16 +3103,23 @@
     }
     
     async function translateSingleMantra(mantraId, targetLang) {
-        if (!aiTranslator) return;
-        
+        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
         const mantra = state.userMantras.find(m => m.id === mantraId) || CURATED_MANTRAS.find(m => m.id === mantraId);
         if (!mantra) return;
 
-        try {
-            const result = await aiTranslator.translate(mantra.text.original, state.settings.language);
-            mantra.text.translated = result.translatedText;
-        } catch (e) {
-            console.error(`Failed to translate mantra ${mantraId}:`, e);
+        if (isDemo) {
+            mantra.text.translated = `[${targetLang}] ${mantra.text.original} (Simulated)`;
+            return;
+        }
+        
+        if (state.aiStatus.translator) {
+            try {
+                if (!aiTranslator) aiTranslator = await window.ai.translator.create();
+                const result = await aiTranslator.translate(mantra.text.original, targetLang);
+                mantra.text.translated = result.translatedText;
+            } catch (e) {
+                console.error(`Failed to translate mantra ${mantraId}:`, e);
+            }
         }
     }
 
@@ -3167,9 +3187,28 @@
         }
 
         if (state.settings.language !== 'en' && state.settings.aiFeatures.enabled) {
-            const needsTranslation = CURATED_MANTRAS.some(m => !m.text.translated);
+            const needsTranslation = CURATED_MANTRAS.some(m => !m.text.translated) || state.userMantras.some(m => !m.text.translated && m.text.original);
             if(needsTranslation) {
-                await handleLanguageChange(state.settings.language);
+                const newLang = state.settings.language;
+                const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
+                if(isDemo) {
+                    await handleFakeLanguageChange(newLang);
+                } else if (state.aiStatus.translator) {
+                     try {
+                        if (!aiTranslator) aiTranslator = await window.ai.translator.create();
+                        const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
+                        const promises = allMantras.map(async (mantra) => {
+                            if (mantra.text.original && !mantra.text.translated) {
+                                try {
+                                    const { translatedText } = await aiTranslator.translate(mantra.text.original, newLang);
+                                    mantra.text.translated = translatedText;
+                                } catch(e) { console.warn(`Could not translate: "${mantra.text.original}"`, e); }
+                            }
+                        });
+                        await Promise.all(promises);
+                        saveState();
+                     } catch(e) { console.error("Initial translation failed", e); }
+                }
             }
         }
     }
