@@ -1054,8 +1054,8 @@
             const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
             let playbackControls = '';
             
-            const playButton = `<button data-action="play-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Play voice memo" title="Play recording">${ICONS.Play({size: 20})}</button>`;
-            const pauseButton = `<button data-action="pause-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Pause voice memo" title="Pause recording">${ICONS.Pause({size: 20})}</button>`;
+            const playButton = `<button data-action="play-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Play recording" title="Play recording">${ICONS.Play({size: 20})}</button>`;
+            const pauseButton = `<button data-action="pause-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Pause recording" title="Pause recording">${ICONS.Pause({size: 20})}</button>`;
             const stopButton = `<button data-action="stop-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Stop playback" title="Stop playback">${ICONS.StopCircle({size: 20})}</button>`;
 
             if (isPlayingThis) {
@@ -1072,7 +1072,7 @@
                     <div class="h-1.5 bg-white/20 rounded-full overflow-hidden flex-grow">
                         <div class="h-full bg-teal audio-progress-bar-inner" data-mantra-id="${mantraId}" style="width: ${isPausedThis || isPlayingThis ? progress : 0}%;"></div>
                     </div>
-                    <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Re-record voice memo" title="Re-record voice">${ICONS.Microphone({size: 20})}</button>
+                    <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Re-record voice memo" title="Re-record your voice">${ICONS.Microphone({size: 20})}</button>
                     <button data-action="delete-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Delete voice memo" title="Delete recording">${ICONS.Trash2({size: 20})}</button>
                 </div>
             `;
@@ -1270,7 +1270,7 @@
                 ${navItems.map(({ path, label, icon }) => {
                     const isActive = currentPath.startsWith(path);
                     return `
-                    <a href="#${path}" aria-label="${label}" class="flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white/20 scale-110' : 'text-white/70 hover:bg-white/10'}">
+                    <a href="#${path}" aria-label="${label}" title="${label}" class="flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white/20 scale-110' : 'text-white/70 hover:bg-white/10'}">
                         ${icon({ size: 24 })}
                         <span class="text-xs mt-1">${label}</span>
                     </a>`
@@ -1335,7 +1335,7 @@
                     ${dailyAffirmationHtml}
                     <h2 class="text-2xl font-serif mb-4">Your mantra space is empty.</h2>
                     <p class="mb-6 text-white/80">Add some mantras from the library to get started!</p>
-                    <a href="#/library">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Go to Library`)}</a>
+                    <a href="#/library" aria-label="Go to Library to add mantras">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Go to Library`)}</a>
                 </div>
             `;
         } else {
@@ -1354,7 +1354,7 @@
             
             const canRewrite = isAnyAiFeatureEnabled();
             const rephraseButton = canRewrite ? `
-                <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-full" aria-label="Rephrase this mantra" title="Rephrase mantra">
+                <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-full" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
                     ${ICONS.Wand2({size: 20})}
                 </button>
             ` : '';
@@ -1402,7 +1402,7 @@
                 <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
                     <h2 class="text-2xl font-serif mb-4">No affirmations yet.</h2>
                     <p class="mb-6 text-white/80">Visit the library to add your first daily affirmation.</p>
-                    <a href="#/library">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Add Affirmation`)}</a>
+                    <a href="#/library" aria-label="Go to Library to add affirmations">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Add Affirmation`)}</a>
                 </div>
             `;
         } else {
@@ -1465,7 +1465,7 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap justify-center gap-2 mb-4">
-                    ${CATEGORIES.map(cat => `<button data-action="library-filter" data-category="${cat}" class="px-3 py-1 text-sm rounded-full transition-colors ${category === cat ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}">${cat}</button>`).join('')}
+                    ${CATEGORIES.map(cat => `<button data-action="library-filter" data-category="${cat}" class="px-3 py-1 text-sm rounded-full transition-colors ${category === cat ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}" aria-label="Filter by ${cat}" title="Filter by ${cat}">${cat}</button>`).join('')}
                 </div>
                 <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
                 ${mantras.length > 0 ? mantras.map(mantra => {
@@ -1473,7 +1473,7 @@
                     return `
                     <div class="glass-card p-4 flex justify-between items-center">
                         <p class="flex-grow">"${getMantraText(mantra)}"</p>
-                        <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="ml-4 p-2 rounded-full transition-colors ${isAdded ? 'bg-teal text-white' : 'bg-white/20 hover:bg-white/30'}" aria-label="${isAdded ? 'Remove mantra' : 'Add mantra'}" title="${isAdded ? 'Remove from My Mantras' : 'Add to My Mantras'}">
+                        <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="ml-4 p-2 rounded-full transition-colors ${isAdded ? 'bg-teal text-white' : 'bg-white/20 hover:bg-white/30'}" aria-label="${isAdded ? 'Remove this mantra from your list' : 'Add this mantra to your list'}" title="${isAdded ? 'Remove from My Mantras' : 'Add to My Mantras'}">
                             ${isAdded ? ICONS.Check({ size: 16 }) : ICONS.Plus({ size: 16 })}
                         </button>
                     </div>`;
@@ -1486,7 +1486,7 @@
             } else {
                 const priorityButtons = ['All', ...PRIORITY_LEVELS].map(p => {
                     const isActive = priorityFilter === p;
-                    return `<button data-action="library-priority-filter" data-priority="${p}" class="px-3 py-1 text-sm rounded-full transition-colors ${isActive ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}">${p}</button>`;
+                    return `<button data-action="library-priority-filter" data-priority="${p}" class="px-3 py-1 text-sm rounded-full transition-colors ${isActive ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}" aria-label="Filter by ${p} priority" title="Filter by ${p} priority">${p}</button>`;
                 }).join('');
 
                 const filteredMantras = priorityFilter === 'All'
@@ -1526,7 +1526,7 @@
                         const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
                         const canRewrite = isAnyAiFeatureEnabled();
                         const rephraseButton = canRewrite ? `
-                            <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Rephrase this mantra" title="Rephrase mantra">
+                            <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
                                 ${ICONS.Wand2({ size: 16 })}
                             </button>
                         ` : '';
@@ -1537,7 +1537,7 @@
                                 <p class="pr-4 flex-grow">"${getMantraText(mantra)}"</p>
                                 <div class="flex gap-2">
                                     ${rephraseButton}
-                                    <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Remove mantra" title="Remove mantra">
+                                    <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Remove this mantra" title="Remove mantra">
                                         ${ICONS.Trash2({ size: 16 })}
                                     </button>
                                 </div>
@@ -1553,7 +1553,7 @@
                                      </div>
                                     <div class="flex items-center gap-2">
                                         ${PRIORITY_LEVELS.map(p => `
-                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : 'bg-white/20 hover:bg-white/30'}" title="Set priority to ${p}">${p}</button>
+                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : 'bg-white/20 hover:bg-white/30'}" aria-label="Set priority to ${p}" title="Set priority to ${p}">${p}</button>
                                         `).join('')}
                                     </div>
                                 </div>
@@ -1581,25 +1581,36 @@
                             <option value="Low">Low Priority</option>
                         </select>
                         <div class="flex gap-2">
-                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled title="Check grammar">${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
-                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled title="Suggest alternative phrasing">${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
-                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-white/20 text-white hover:bg-white/30 focus:ring-white flex items-center justify-center gap-2" disabled title="Add new mantra">${ICONS.Plus({size: 20})}<span>Add</span></button>
+                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Check grammar for the text above" title="Check grammar">${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
+                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Suggest alternative phrasing for the text above" title="Suggest alternative phrasing">${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
+                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-white/20 text-white hover:bg-white/30 focus:ring-white flex items-center justify-center gap-2" disabled aria-label="Add this new mantra to your list" title="Add new mantra">${ICONS.Plus({size: 20})}<span>Add</span></button>
                         </div>
                     </div>
                 </div>
             `;
         } else if (tab === 'my-affirmations') {
+            const aiGenerateButton = showAiFeatures ? `
+                <div class="my-4 text-center">
+                    ${renderButton(`${ICONS.Sparkles({className: 'inline-block mr-2', size: 20})} Generate with AI`, {
+                        variant: 'secondary',
+                        attributes: 'data-action="open-ai-affirmation-modal" title="Generate affirmations with AI"'
+                    })}
+                </div>
+            ` : '';
+
+            content = aiGenerateButton;
+
              if (state.userAffirmations.length === 0) {
-                content = `
+                content += `
                     <div class="text-center p-8">
                         <p class="text-white/80 mb-4">Add your personal affirmations to see them here.</p>
                     </div>
                 `;
             } else {
-                content = `<div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">${state.userAffirmations.map(affirmation => `
+                content += `<div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">${state.userAffirmations.map(affirmation => `
                     <div class="glass-card p-4 flex justify-between items-center">
                         <p>"${affirmation.text}"</p>
-                        <button data-action="remove-affirmation" data-affirmation-id='${affirmation.id}' class="ml-4 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Remove affirmation" title="Remove affirmation">
+                        <button data-action="remove-affirmation" data-affirmation-id='${affirmation.id}' class="ml-4 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Remove this affirmation" title="Remove affirmation">
                            ${ICONS.Trash2({ size: 16 })}
                         </button>
                     </div>`).join('')}</div>`;
@@ -1884,7 +1895,7 @@
                     <h2 class="text-lg font-semibold mb-3">Theme</h2>
                     <div class="grid grid-cols-2 gap-3">
                         ${THEME_OPTIONS.map(theme => `
-                            <button data-action="set-theme" data-theme="${theme.id}" class="w-full h-16 rounded-lg border-2 ${s.theme === theme.id ? 'border-white' : 'border-transparent'}" style="background-image: ${theme.gradient};">
+                            <button data-action="set-theme" data-theme="${theme.id}" class="w-full h-16 rounded-lg border-2 ${s.theme === theme.id ? 'border-white' : 'border-transparent'}" style="background-image: ${theme.gradient};" aria-label="Set theme to ${theme.name}" title="Set theme to ${theme.name}">
                                 <span class="sr-only">${theme.name}</span>
                             </button>
                         `).join('')}
@@ -1894,13 +1905,13 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <h2 class="text-lg font-semibold mb-3">Font Style</h2>
                      <div class="flex gap-3">
-                        ${FONT_OPTIONS.map(font => `<button data-action="set-font" data-font="${font.id}" class="flex-1 p-3 rounded-lg text-center ${s.font === font.id ? 'bg-white text-deep-purple' : 'bg-white/20'}">${font.name}</button>`).join('')}
+                        ${FONT_OPTIONS.map(font => `<button data-action="set-font" data-font="${font.id}" class="flex-1 p-3 rounded-lg text-center ${s.font === font.id ? 'bg-white text-deep-purple' : 'bg-white/20'}" aria-label="Set font to ${font.name}" title="Set font to ${font.name}">${font.name}</button>`).join('')}
                     </div>
                 </div>
                 
                 <div class="glass-card p-4 rounded-xl mb-4 flex justify-between items-center">
                     <h2 class="text-lg font-semibold">Dark Mode</h2>
-                    <button data-action="toggle-dark-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.isDarkMode ? 'bg-teal' : 'bg-white/20'}">
+                    <button data-action="toggle-dark-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.isDarkMode ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle dark mode" title="Toggle dark mode">
                         <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.isDarkMode ? 'translate-x-6' : 'translate-x-0'}"></span>
                     </button>
                 </div>
@@ -1908,7 +1919,7 @@
                  <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Timer({size: 20})} Slideshow</h2>
-                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle slideshow mode" title="Toggle slideshow mode">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.slideshow.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1931,7 +1942,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Microphone({size: 20})} Voice Features</h2>
-                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : 'bg-white/20'}" ${!isAudioSupported ? 'disabled' : ''}>
+                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : 'bg-white/20'}" ${!isAudioSupported ? 'disabled' : ''} aria-label="Toggle voice recording features" title="Toggle voice recording features">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.voiceFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1941,7 +1952,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Music4({size: 20})} Celebration Sounds</h2>
-                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle celebration sounds" title="Toggle celebration sounds">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.celebrationSounds.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1950,7 +1961,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Vibrate({size: 20})} Haptic Feedback</h2>
-                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle haptic feedback" title="Toggle haptic feedback">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.haptics.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1960,7 +1971,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Bell({size: 20})} Mantra Reminders</h2>
-                        <button data-action="set-notification-prop" data-type="mantras" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.mantras.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="set-notification-prop" data-type="mantras" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.mantras.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle mantra reminders" title="Toggle mantra reminders">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.mantras.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1975,7 +1986,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Smile({size: 20})} Daily Affirmation Reminder</h2>
-                        <button data-action="set-notification-prop" data-type="affirmation" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.affirmation.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="set-notification-prop" data-type="affirmation" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.affirmation.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle daily affirmation reminder" title="Toggle daily affirmation reminder">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.affirmation.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1990,7 +2001,7 @@
 
                  ${deferredInstallPrompt ? `
                     <div class="mt-6 text-center">
-                        ${renderButton('Install App', { attributes: 'data-action="install-pwa"'})}
+                        ${renderButton('Install App', { attributes: 'data-action="install-pwa" title="Install MantraOS to your device"'})}
                     </div>` : ''}
 
                  <div class="glass-card p-4 rounded-xl mb-4">
@@ -2016,7 +2027,7 @@
                 </div>
 
                  <div class="mt-6 text-center">
-                     <button data-action="reset-app" class="text-red-400 hover:text-red-300 transition-colors">Reset Application Data</button>
+                     <button data-action="reset-app" class="text-red-400 hover:text-red-300 transition-colors" title="Delete all data and reset the app">Reset Application Data</button>
                  </div>
             </div>
         `;
@@ -2662,6 +2673,7 @@
                 }
                 break;
             case 'open-ai-generate-modal': handleAiGenerate(); break;
+            case 'open-ai-affirmation-modal': handleAiAffirmationGenerate(); break;
             case 'rewrite-mantra': handleAiRewrite(mantraId); break;
             case 'proofread-mantra': handleAiProofread(); break;
             case 'suggest-phrasing': handleAiSuggestPhrasing(); break;
@@ -2679,6 +2691,13 @@
                 document.getElementById('ai-suggestion-container').innerHTML = '';
                 // Trigger input event to re-validate buttons and char count
                 textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                break;
+            }
+            case 'add-ai-affirmation': {
+                const newAffirmation = { id: `affirm-${Date.now()}`, text: target.dataset.text };
+                performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
+                target.innerHTML = ICONS.Check({size: 16});
+                target.disabled = true;
                 break;
             }
         }
@@ -2730,6 +2749,21 @@
                     `[${options.tone}] Your creative ${options.length} ${topic} mantra. (Simulated)`
                 ].map(m => m.replace('creative', options.creativity));
                 resolve(JSON.stringify(fakeMantras));
+            }, 800);
+        });
+    };
+
+    const handleFakeAiAffirmationGenerate = (topic, options) => {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const fakeAffirmations = [
+                    `I am a master of ${topic} and success flows to me. (Simulated)`,
+                    `My ${topic} grows stronger every single day. (Simulated)`,
+                    `I am confident in my ability to achieve great ${topic}. (Simulated)`,
+                    `I am worthy of all the good things that come from my ${topic}. (Simulated)`,
+                    `I attract positive outcomes in my ${topic}. (Simulated)`
+                ];
+                resolve(JSON.stringify(fakeAffirmations));
             }, 800);
         });
     };
@@ -2914,6 +2948,114 @@
                     <p class="text-white/80 mb-6">The AI could not generate mantras for this topic. Please try a different topic or try again later.</p>
                     ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
                 contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+            }
+        });
+    }
+
+    async function handleAiAffirmationGenerate() {
+        const modalId = 'ai-affirmation-generate-modal';
+        const { creativity, tone, length } = state.settings.aiSettings;
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 text-center animate-slide-in-up" id="ai-affirmation-generate-content">
+                    <h2 class="text-2xl font-serif mb-4">Generate Affirmations</h2>
+                    <p class="text-white/80 mb-6">What personal theme would you like to focus on?</p>
+                    <input type="text" id="ai-topic-input" placeholder="e.g., self-love, career success" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white mb-4">
+                    
+                    <details class="text-left mb-4">
+                        <summary class="cursor-pointer text-sm font-semibold text-white/80">Advanced Options</summary>
+                        <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
+                             <div class="flex justify-between items-center text-sm">
+                                <label for="ai-generate-creativity">Creativity</label>
+                                <select id="ai-generate-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                    <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
+                                    <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
+                                    <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <label for="ai-generate-tone">Tone</label>
+                                <select id="ai-generate-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                    <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
+                                    <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+
+                    ${renderButton('Generate', { attributes: 'id="ai-affirmation-generate-submit"' })}
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        const modalElement = document.getElementById(modalId);
+        const submitBtn = document.getElementById('ai-affirmation-generate-submit');
+        
+        const closeModal = () => modalElement?.remove();
+        modalElement.addEventListener('click', (e) => { if(e.target === modalElement) closeModal(); });
+
+        submitBtn.addEventListener('click', async () => {
+            const topic = document.getElementById('ai-topic-input').value.trim();
+            if (!topic) return;
+            
+            const newCreativity = document.getElementById('ai-generate-creativity').value;
+            const newTone = document.getElementById('ai-generate-tone').value;
+
+            state.settings.aiSettings.creativity = newCreativity;
+            state.settings.aiSettings.tone = newTone;
+            saveState();
+
+            const contentContainer = document.getElementById('ai-affirmation-generate-content');
+            contentContainer.innerHTML = `
+                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-white/80">Generating affirmations about ${topic}...</p>`;
+
+            const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
+            
+            try {
+                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
+                const temperature = creativityMap[newCreativity] || 0.7;
+                
+                const prompt = `Generate 5 positive personal affirmations about "${topic}". Make them empowering, present-tense, and personal. Return the result as a JSON array of strings.`;
+                
+                const result = isDemo 
+                    ? await handleFakeAiAffirmationGenerate(topic) 
+                    : await (await getAiTextSession()).prompt(prompt, { temperature });
+                
+                const affirmations = JSON.parse(result);
+                
+                const modalTitle = isDemo 
+                    ? `Generated Affirmations <span class="text-sm text-teal-300">(Simulated)</span>` 
+                    : 'Generated Affirmations';
+                
+                contentContainer.innerHTML = `
+                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
+                    <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
+                    ${affirmations.map((affirm, index) => `
+                        <div class="glass-card p-3 flex justify-between items-center">
+                            <p>"${affirm}"</p>
+                            <button data-action="add-ai-affirmation" data-text="${String(affirm).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Add this affirmation" title="Add to My Affirmations">${ICONS.Plus({size: 16})}</button>
+                        </div>`).join('')}
+                    </div>
+                    ${renderButton('Done', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
+
+                contentContainer.querySelector('[data-action="close-ai-affirmation-modal-final"]').addEventListener('click', closeModal);
+                contentContainer.querySelectorAll('[data-action="add-ai-affirmation"]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const newAffirmation = { id: `affirm-${Date.now()}`, text: e.currentTarget.dataset.text };
+                        performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
+                        e.currentTarget.innerHTML = ICONS.Check({size: 16});
+                        e.currentTarget.disabled = true;
+                    });
+                });
+            } catch (error) {
+                console.error("AI Affirmation Generation failed:", error);
+                contentContainer.innerHTML = `
+                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
+                    <p class="text-white/80 mb-6">The AI could not generate affirmations for this topic. Please try again.</p>
+                    ${renderButton('Close', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
+                contentContainer.querySelector('[data-action="close-ai-affirmation-modal-final"]').addEventListener('click', closeModal);
             }
         });
     }
