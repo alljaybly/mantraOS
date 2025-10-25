@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MantraOS</title>
   
-  <!-- For production, it's recommended to process Tailwind CSS via a build step to purge unused styles and improve performance. -->
+  <!-- Tailwind CDN used for hackathon simplicity; compile for production -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Google Fonts -->
@@ -16,8 +16,8 @@
   <!-- PWA Manifest & Themeing -->
   <meta name="theme-color" content="#667eea">
   <link rel="manifest" href="manifest.json">
-  <!-- The icon path is root-relative. If you see a 404, ensure your local server is configured to serve from the project root. -->
-  <link rel="apple-touch-icon" href="/icon-192.svg">
+  <!-- Ensure icon-192.svg exists or use icon-192.png as fallback -->
+  <link rel="apple-touch-icon" href="/icon-192.png">
 
 
   <script>
@@ -277,6 +277,7 @@
             } catch (e) { console.log('[MantraOS AI Diagnostics] assistant.canPrompt: Unavailable', e.message); }
         } else {
             console.log('[MantraOS AI Diagnostics] window.ai object not found. AI features are unavailable.');
+            renderToast('AI features unavailable. Using demo mode.');
         }
         state.aiStatus = status;
         console.log('[MantraOS AI Diagnostics] Check complete. Final status:', state.aiStatus);
@@ -2678,7 +2679,7 @@
                 renderLoadingModal("Testing AI...");
                 try {
                     const session = await window.ai.createTextSession();
-                    const result = await session.prompt("Say 'hello'");
+                    const result = await session.prompt("Say 'hello'", { outputLanguage: 'en' });
                     closeLoadingModal();
                     if (result.toLowerCase().includes('hello')) {
                         renderModal("AI Test Successful", "The on-device AI is working correctly.");
@@ -3099,7 +3100,7 @@
                 
                 const result = isDemo 
                     ? await handleFakeAiGenerate(topic, { creativity: newCreativity, tone: newTone, length: newLength }) 
-                    : await (await getAiTextSession()).prompt(prompt, { temperature });
+                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
                 
                 displayGeneratedMantras(result, isDemo);
 
@@ -3179,7 +3180,7 @@
                 
                 const result = isDemo 
                     ? await handleFakeAiAffirmationGenerate(topic) 
-                    : await (await getAiTextSession()).prompt(prompt, { temperature });
+                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
                 
                 const affirmations = JSON.parse(result);
                 
@@ -3287,7 +3288,7 @@
                 
                 const result = isDemo
                     ? await handleFakeAiRewrite(mantra.text.original, { creativity: newCreativity, tone: newTone })
-                    : await (await getAiTextSession()).prompt(prompt, { temperature });
+                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
                 
                 const options = JSON.parse(result);
 
@@ -3377,9 +3378,10 @@
         const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
 
         try {
+            const prompt = `Generate 3 alternative phrasings for the positive affirmation: "${text}". Keep them concise and empowering. Return the result as a JSON array of strings.`;
             const result = isDemo
                 ? await handleFakeAiSuggestPhrasing(text)
-                : await (await getAiTextSession()).prompt(`Generate 3 alternative phrasings for the positive affirmation: "${text}". Keep them concise and empowering. Return the result as a JSON array of strings.`);
+                : await (await getAiTextSession()).prompt(prompt, { outputLanguage: 'en' });
 
             const suggestions = JSON.parse(result);
             
