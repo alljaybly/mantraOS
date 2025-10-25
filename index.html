@@ -33,6 +33,7 @@
             'deep-purple': '#667eea',
             'gold': '#f6d365',
             'teal': '#4facfe',
+            'charcoal': '#333333',
           },
           animation: {
             'fade-in': 'fadeIn 0.5s ease-in-out',
@@ -108,13 +109,17 @@
         font-family: var(--font-family);
     }
     body {
-      transition: background 0.5s ease-in-out;
+      transition: background 0.5s ease-in-out, color 0.5s ease-in-out;
     }
     .glass-card {
       background: rgba(255, 255, 255, 0.1);
       -webkit-backdrop-filter: blur(10px);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .text-charcoal .glass-card {
+        background: rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.1);
     }
     .dark .glass-card {
         background: rgba(0, 0, 0, 0.2);
@@ -222,6 +227,27 @@
         Languages: createIcon('Languages', '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>'),
         Wand2: createIcon('Wand2', '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M11.8 17.8 13 19"/><path d="M19 11.8 17.8 13"/><path d="M13 11.8 11.8 13"/><path d="m21.1 12.3-1.1 1.1a4.9 4.9 0 0 1-7 7l-1.8-1.8a4.9 4.9 0 0 1 7-7l1.1-1.1Z"/><path d="M3 21a2.4 2.4 0 0 1 0-3.4l3.1-3.1"/>'),
         Cpu: createIcon('Cpu', '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>'),
+    };
+
+    // --- COLOR & THEME UTILS ---
+    const getTextColorClasses = () => {
+        const theme = state.settings.theme;
+        const needsDarkText = theme === 'theme-gradient-2' || theme === 'theme-gradient-3';
+        return {
+            primary: needsDarkText ? 'text-charcoal' : 'text-white',
+            secondary: needsDarkText ? 'text-charcoal/80' : 'text-white/80',
+            tertiary: needsDarkText ? 'text-charcoal/60' : 'text-white/60',
+            accent: needsDarkText ? 'text-deep-purple' : 'text-teal',
+            placeholder: needsDarkText ? 'placeholder-charcoal/50' : 'placeholder-white/50',
+            bgMuted: needsDarkText ? 'bg-black/10' : 'bg-white/10',
+            bgMuted20: needsDarkText ? 'bg-black/20' : 'bg-white/20',
+            bgHover: needsDarkText ? 'hover:bg-black/20' : 'hover:bg-white/20',
+            bgHover30: needsDarkText ? 'hover:bg-black/30' : 'hover:bg-white/30',
+            ring: needsDarkText ? 'focus:ring-charcoal' : 'focus:ring-white',
+            border: needsDarkText ? 'border-black/20' : 'border-white/20',
+            accentCheckbox: needsDarkText ? 'accent-deep-purple' : 'accent-teal',
+            needsDarkText,
+        };
     };
 
     // --- CHROME AI ---
@@ -602,8 +628,9 @@
         return longestStreak;
     };
     const applySettings = () => {
+        const colors = getTextColorClasses();
         document.body.className = '';
-        document.body.classList.add(state.settings.theme, 'antialiased', 'text-white', 'transition-colors', 'duration-500', 'bg-[length:200%_200%]', 'animate-gradient-shift');
+        document.body.classList.add(state.settings.theme, 'antialiased', colors.primary, 'transition-colors', 'duration-500', 'bg-[length:200%_200%]', 'animate-gradient-shift');
         document.documentElement.classList.toggle('dark', state.settings.isDarkMode);
         document.documentElement.style.setProperty('--font-family', state.settings.font === 'font-sans' ? "'Poppins', sans-serif" : "'Playfair Display', serif");
     };
@@ -833,21 +860,24 @@
 
     // --- TEMPLATING / RENDERING ---
     const renderButton = (text, { variant = 'primary', additionalClasses = '', attributes = '' } = {}) => {
+      const colors = getTextColorClasses();
       const baseClasses = 'px-6 py-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+      const ghostHover = colors.needsDarkText ? 'hover:bg-black/10' : 'hover:bg-white/10';
       const variantClasses = {
         primary: 'bg-white text-deep-purple hover:bg-opacity-90 focus:ring-white',
-        secondary: 'bg-white/20 text-white hover:bg-white/30 focus:ring-white',
-        ghost: 'bg-transparent text-white hover:bg-white/10 focus:ring-white',
+        secondary: `${colors.bgMuted20} ${colors.primary} ${colors.bgHover30} ${colors.ring}`,
+        ghost: `bg-transparent ${colors.primary} ${ghostHover} ${colors.ring}`,
       };
       return `<button class="${baseClasses} ${variantClasses[variant]} ${additionalClasses}" ${attributes}>${text}</button>`;
     }
     
     const renderModal = (title, content, onclose) => {
+        const colors = getTextColorClasses();
         const modalHTML = `
             <div id="app-modal" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up">
                     <h2 class="text-2xl font-serif mb-4">${title}</h2>
-                    <div class="text-white/80 mb-6">${content}</div>
+                    <div class="${colors.secondary} mb-6">${content}</div>
                     ${renderButton('Got it!', { attributes: 'data-action="close-modal"' })}
                 </div>
             </div>
@@ -865,13 +895,14 @@
     };
 
     const renderLoadingModal = (message) => {
+        const colors = getTextColorClasses();
         const modalId = 'app-loading-modal';
         document.getElementById(modalId)?.remove();
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[110] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-xs rounded-2xl p-6 text-center animate-slide-in-up">
-                    <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                    <p class="text-white/80">${message}</p>
+                    <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
+                    <p class="${colors.secondary}">${message}</p>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -882,6 +913,7 @@
     };
 
     const renderConfirmationModal = (title, content, onConfirm, options = {}) => {
+        const colors = getTextColorClasses();
         const { confirmText = 'Confirm', confirmVariant = 'primary' } = options;
         const modalId = 'app-confirmation-modal';
         document.getElementById(modalId)?.remove();
@@ -899,7 +931,7 @@
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up">
                     <h2 class="text-2xl font-serif mb-4 ${titleClasses[confirmVariant] || ''}">${title}</h2>
-                    <div class="text-white/80 mb-6">${content}</div>
+                    <div class="${colors.secondary} mb-6">${content}</div>
                     <div class="flex gap-4 justify-center">
                         ${renderButton('Cancel', { variant: 'secondary', additionalClasses: 'flex-1', attributes: 'data-action="close-confirm-modal"' })}
                         ${renderButton(confirmText, { variant: 'primary', additionalClasses: `flex-1 ${confirmButtonClasses[confirmVariant] || ''}`, attributes: 'data-action="confirm-modal-action"' })}
@@ -928,11 +960,11 @@
         
         clearTimeout(toastTimeout);
         container.innerHTML = ''; // Clear previous toast
-
+        const colors = getTextColorClasses();
         const toast = document.createElement('div');
-        toast.className = 'glass-card flex items-center justify-between p-3 rounded-xl shadow-lg animate-toast-in';
+        toast.className = `glass-card flex items-center justify-between p-3 rounded-xl shadow-lg animate-toast-in ${colors.primary}`;
         
-        const undoButton = hasUndo ? `<button data-action="undo" class="font-bold text-teal ml-4">Undo</button>` : '';
+        const undoButton = hasUndo ? `<button data-action="undo" class="font-bold ${colors.accent} ml-4">Undo</button>` : '';
         toast.innerHTML = `<span>${message}</span> ${undoButton}`;
         
         container.appendChild(toast);
@@ -967,14 +999,15 @@
     const renderCelebrationModal = (title, description, icon) => {
         const modalId = 'celebration-modal';
         document.getElementById(modalId)?.remove();
+        const colors = getTextColorClasses();
 
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 animate-fade-in overflow-hidden">
                 <div id="confetti-container" class="absolute inset-0 pointer-events-none"></div>
-                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up relative">
+                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up relative ${colors.primary}">
                     <div class="text-gold mb-4">${icon}</div>
                     <h2 class="text-3xl font-serif mb-3">${title}</h2>
-                    <p class="text-white/80 mb-6">${description}</p>
+                    <p class="${colors.secondary} mb-6">${description}</p>
                     ${renderButton('Awesome!', { attributes: `data-action="close-celebration-modal"` })}
                 </div>
             </div>
@@ -986,12 +1019,12 @@
 
         // Create and animate confetti
         const container = document.getElementById('confetti-container');
-        const colors = ['#f6d365', '#4facfe', '#764ba2', '#ffffff'];
+        const confettiColors = ['#f6d365', '#4facfe', '#764ba2', '#ffffff'];
         for (let i = 0; i < 100; i++) {
             const confetti = document.createElement('div');
             confetti.className = 'confetti-piece';
             confetti.style.left = `${Math.random() * 100}vw`;
-            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
             confetti.style.animation = `confetti-fall ${2 + Math.random() * 2}s ${Math.random() * 2}s ease-out forwards`;
             confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
             container.appendChild(confetti);
@@ -1039,9 +1072,10 @@
     };
     
     const renderAudioInterface = (mantraId) => {
+        const colors = getTextColorClasses();
         if (!isAudioSupported) {
             return `
-                <div class="flex items-center gap-2 text-sm text-white/60" title="Your browser does not support the MediaRecorder API required for voice recording.">
+                <div class="flex items-center gap-2 text-sm ${colors.tertiary}" title="Your browser does not support the MediaRecorder API required for voice recording.">
                     ${ICONS.MicOff({size: 20})}
                     <span class="italic">Recording not supported</span>
                 </div>
@@ -1061,11 +1095,11 @@
                     <div class="relative flex items-center justify-center w-20 h-20">
                         <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
                         <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
-                        <button data-action="stop-recording" data-mantra-id="${mantraId}" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg" aria-label="Stop recording" title="Stop recording">
+                        <button data-action="stop-recording" data-mantra-id="${mantraId}" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg text-white" aria-label="Stop recording" title="Stop recording">
                             ${ICONS.StopCircle({size: 24})}
                         </button>
                     </div>
-                    <div id="audio-timer-${mantraId}" class="text-lg font-mono text-white/80 font-semibold">${MAX_RECORDING_SECONDS}s left</div>
+                    <div id="audio-timer-${mantraId}" class="text-lg font-mono ${colors.secondary} font-semibold">${MAX_RECORDING_SECONDS}s left</div>
                 </div>
             `;
         }
@@ -1074,9 +1108,9 @@
             const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
             let playbackControls = '';
             
-            const playButton = `<button data-action="play-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Play recording" title="Play recording">${ICONS.Play({size: 20})}</button>`;
-            const pauseButton = `<button data-action="pause-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Pause recording" title="Pause recording">${ICONS.Pause({size: 20})}</button>`;
-            const stopButton = `<button data-action="stop-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Stop playback" title="Stop playback">${ICONS.StopCircle({size: 20})}</button>`;
+            const playButton = `<button data-action="play-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Play recording" title="Play recording">${ICONS.Play({size: 20})}</button>`;
+            const pauseButton = `<button data-action="pause-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Pause recording" title="Pause recording">${ICONS.Pause({size: 20})}</button>`;
+            const stopButton = `<button data-action="stop-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Stop playback" title="Stop playback">${ICONS.StopCircle({size: 20})}</button>`;
 
             if (isPlayingThis) {
                 playbackControls = `${pauseButton}${stopButton}`;
@@ -1089,21 +1123,21 @@
             return `
                 <div class="flex items-center gap-2 w-full max-w-xs">
                     ${playbackControls}
-                    <div class="h-1.5 bg-white/20 rounded-full overflow-hidden flex-grow">
+                    <div class="h-1.5 ${colors.bgMuted20} rounded-full overflow-hidden flex-grow">
                         <div class="h-full bg-teal audio-progress-bar-inner" data-mantra-id="${mantraId}" style="width: ${isPausedThis || isPlayingThis ? progress : 0}%;"></div>
                     </div>
-                    <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Re-record voice memo" title="Re-record your voice">${ICONS.Microphone({size: 20})}</button>
-                    <button data-action="delete-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Delete voice memo" title="Delete recording">${ICONS.Trash2({size: 20})}</button>
+                    <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Re-record voice memo" title="Re-record your voice">${ICONS.Microphone({size: 20})}</button>
+                    <button data-action="delete-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Delete voice memo" title="Delete recording">${ICONS.Trash2({size: 20})}</button>
                 </div>
             `;
         }
     
         return `
             <div class="flex items-center gap-2">
-                <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 bg-white/20 hover:bg-white/30 rounded-full" aria-label="Record voice memo" title="Record your voice">
+                <button data-action="record-voice" data-mantra-id="${mantraId}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Record voice memo" title="Record your voice">
                     ${ICONS.Microphone({size: 20})}
                 </button>
-                <span class="text-sm text-white/60">Add Your Voice</span>
+                <span class="text-sm ${colors.tertiary}">Add Your Voice</span>
             </div>
         `;
     };
@@ -1111,12 +1145,13 @@
     const renderUndoRedoControls = () => {
         const canUndo = undoHistory.length > 0;
         const canRedo = redoHistory.length > 0;
+        const colors = getTextColorClasses();
         return `
             <div class="flex gap-2">
-                <button data-action="undo" class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Undo" title="Undo (Ctrl+Z)" ${!canUndo ? 'disabled' : ''}>
+                <button data-action="undo" class="p-2 rounded-full ${colors.bgMuted} ${colors.bgHover} transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Undo" title="Undo (Ctrl+Z)" ${!canUndo ? 'disabled' : ''}>
                     ${ICONS.RotateCcw({ size: 20 })}
                 </button>
-                <button data-action="redo" class="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Redo" title="Redo (Ctrl+Y)" ${!canRedo ? 'disabled' : ''}>
+                <button data-action="redo" class="p-2 rounded-full ${colors.bgMuted} ${colors.bgHover} transition-colors disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Redo" title="Redo (Ctrl+Y)" ${!canRedo ? 'disabled' : ''}>
                     ${ICONS.RotateCw({ size: 20 })}
                 </button>
             </div>
@@ -1125,10 +1160,11 @@
 
     const renderPage = (content, { showBackButton = false, showUndoRedo = false } = {}) => {
         const isAppView = !window.location.hash.includes('onboarding');
+        const colors = getTextColorClasses();
         const headerContent = (showBackButton || showUndoRedo) ? `
             <header class="flex justify-between items-center mb-4">
                 ${showBackButton ? `
-                    <button data-action="go-back" class="inline-flex items-center gap-2 p-2 pr-4 rounded-full bg-white/10 hover:bg-white/20 transition-colors" aria-label="Go back" title="Go back">
+                    <button data-action="go-back" class="inline-flex items-center gap-2 p-2 pr-4 rounded-full ${colors.bgMuted} ${colors.bgHover} transition-colors" aria-label="Go back" title="Go back">
                         ${ICONS.ArrowLeft({ size: 20 })}
                         <span class="text-sm">Back</span>
                     </button>
@@ -1148,6 +1184,7 @@
     
     // --- ONBOARDING VIEWS ---
     const renderOnboarding = (step) => {
+        // Onboarding has a fixed theme, so no dynamic colors needed here.
         let content = '';
         const backButton = (path) => `
             <div class="absolute top-4 left-4">
@@ -1173,7 +1210,7 @@
                         ${ICONS.Layers({ size: 48, className: "mx-auto mb-4 text-teal" })}
                         <h2 class="text-3xl font-serif mb-4">Focus Your Intentions</h2>
                         <p class="text-white/80 mb-6">We'll start by selecting from key life areas to personalize your experience.</p>
-                        <div class="flex flex-wrap justify-center gap-2 mb-8">${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<span class="bg-white/20 px-3 py-1 rounded-full text-sm">${cat}</span>`).join('')}</div>
+                        <div class="flex flex-wrap justify-center gap-2 mb-8">${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<span class="bg-white/20 px-3 py-1 rounded-full text-sm text-white">${cat}</span>`).join('')}</div>
                         ${renderButton('Choose My Mantras', { attributes: 'data-action="nav" data-path="/onboarding/mantras"'})}
                     </div>`;
                 break;
@@ -1195,8 +1232,6 @@
                     feedbackText = `Maximum selected. You're ready to proceed!`;
                     feedbackColorClass = 'text-teal-300';
                 } else {
-                    // This case is currently unreachable due to the click handler logic
-                    // but we'll leave it for robustness.
                     feedbackText = 'Select between 3 and 5 mantras.';
                     feedbackColorClass = 'text-red-400';
                 }
@@ -1276,6 +1311,7 @@
 
     // --- MAIN APP VIEWS ---
     const renderBottomNav = () => {
+        const colors = getTextColorClasses();
         const navItems = [
           { path: '/dashboard', label: 'Home', icon: ICONS.Home },
           { path: '/affirmations', label: 'Affirm', icon: ICONS.Smile },
@@ -1290,7 +1326,7 @@
                 ${navItems.map(({ path, label, icon }) => {
                     const isActive = currentPath.startsWith(path);
                     return `
-                    <a href="#${path}" aria-label="${label}" title="${label}" class="flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white/20 scale-110' : 'text-white/70 hover:bg-white/10'}">
+                    <a href="#${path}" aria-label="${label}" title="${label}" class="flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 ${isActive ? `${colors.bgMuted20} scale-110` : `${colors.tertiary} ${colors.bgHover}`}">
                         ${icon({ size: 24 })}
                         <span class="text-xs mt-1">${label}</span>
                     </a>`
@@ -1301,6 +1337,7 @@
     };
 
     const renderDashboard = () => {
+        const colors = getTextColorClasses();
         // --- Daily Affirmation Logic ---
         const checkAndShowAffirmation = () => {
             const { affirmation } = state.settings.notifications;
@@ -1342,7 +1379,7 @@
         
         const dailyAffirmationHtml = (showAffirmationOnDash && state.dailyAffirmation) ? `
             <div class="my-4 text-center animate-slide-in-up">
-                <p class="text-sm font-semibold uppercase tracking-wider text-white/70 mb-1">Your Daily Affirmation</p>
+                <p class="text-sm font-semibold uppercase tracking-wider ${colors.secondary} mb-1">Your Daily Affirmation</p>
                 <p class="text-lg italic font-sans">"${state.dailyAffirmation.text}"</p>
             </div>
         ` : '';
@@ -1354,7 +1391,7 @@
                 <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
                     ${dailyAffirmationHtml}
                     <h2 class="text-2xl font-serif mb-4">Your mantra space is empty.</h2>
-                    <p class="mb-6 text-white/80">Add some mantras from the library to get started!</p>
+                    <p class="mb-6 ${colors.secondary}">Add some mantras from the library to get started!</p>
                     <a href="#/library" aria-label="Go to Library to add mantras">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Go to Library`)}</a>
                 </div>
             `;
@@ -1363,18 +1400,18 @@
             recordMantraView(currentMantra.id);
             
             const streak = getStreak();
-            const streakIcon = streak > 0 ? ICONS.Zap({ size: 16, className: 'inline-block text-gold -mt-1 mr-1' }) : '';
+            const streakIcon = streak > 0 ? ICONS.Zap({ size: 16, className: `inline-block ${colors.needsDarkText ? 'text-orange-500' : 'text-gold'} -mt-1 mr-1` }) : '';
             const priorityColor = PRIORITIES[currentMantra?.priority] || PRIORITIES['Medium'];
 
             const slideshowProgressBar = state.settings.slideshow.enabled && state.userMantras.length > 1 ? `
-                <div class="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-2">
+                <div class="w-full h-1 ${colors.bgMuted20} rounded-full overflow-hidden mt-2">
                     <div class="h-full bg-teal" style="animation: slideshow-progress ${state.settings.slideshow.interval}s linear forwards;"></div>
                 </div>
             ` : '';
             
             const canRewrite = isAnyAiFeatureEnabled();
             const rephraseButton = canRewrite ? `
-                <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 bg-white/10 hover:bg-white/20 rounded-full" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
+                <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
                     ${ICONS.Wand2({size: 20})}
                 </button>
             ` : '';
@@ -1382,9 +1419,9 @@
             content = `
                 <div class="flex flex-col h-[calc(100vh-8rem)] justify-between">
                   <div class="flex justify-around text-center glass-card p-3 rounded-full">
-                    <div><p class="text-sm text-white/70">Total Views</p><p class="font-bold text-lg">${getTotalViews()}</p></div>
-                    <div><p class="text-sm text-white/70">Current Streak</p><p class="font-bold text-lg">${streakIcon}${streak} days</p></div>
-                    <div><p class="text-sm text-white/70">Views Today</p><p class="font-bold text-lg">${state.progress[currentMantra?.id]?.views || 0}</p></div>
+                    <div><p class="text-sm ${colors.secondary}">Total Views</p><p class="font-bold text-lg">${getTotalViews()}</p></div>
+                    <div><p class="text-sm ${colors.secondary}">Current Streak</p><p class="font-bold text-lg">${streakIcon}${streak} days</p></div>
+                    <div><p class="text-sm ${colors.secondary}">Views Today</p><p class="font-bold text-lg">${state.progress[currentMantra?.id]?.views || 0}</p></div>
                   </div>
                   
                   ${dailyAffirmationHtml}
@@ -1397,12 +1434,12 @@
                     <div id="audio-controls-${currentMantra?.id}" class="flex justify-center mb-4">
                         ${renderAudioInterface(currentMantra?.id)}
                     </div>
-                    <p class="bg-white/20 inline-flex items-center px-3 py-1 rounded-full text-sm mb-4">
+                    <p class="${colors.bgMuted20} inline-flex items-center px-3 py-1 rounded-full text-sm mb-4">
                         <span class="w-2.5 h-2.5 ${priorityColor} rounded-full mr-2"></span>
                         ${currentMantra?.category}
                     </p>
                     <div class="flex justify-center mt-4 space-x-2" id="dot-indicators">
-                        ${state.userMantras.map((_, index) => `<button data-action="set-mantra-index" data-index="${index}" class="w-2 h-2 rounded-full transition-colors ${state.currentMantraIndex === index ? 'bg-white' : 'bg-white/30'}" aria-label="Go to mantra ${index + 1}" title="Go to mantra ${index + 1}"></button>`).join('')}
+                        ${state.userMantras.map((_, index) => `<button data-action="set-mantra-index" data-index="${index}" class="w-2 h-2 rounded-full transition-colors ${state.currentMantraIndex === index ? (colors.needsDarkText ? 'bg-charcoal' : 'bg-white') : (colors.needsDarkText ? 'bg-charcoal/30' : 'bg-white/30')}" aria-label="Go to mantra ${index + 1}" title="Go to mantra ${index + 1}"></button>`).join('')}
                     </div>
                     ${slideshowProgressBar}
                   </div>
@@ -1417,11 +1454,12 @@
 
     const renderAffirmations = () => {
         let content;
+        const colors = getTextColorClasses();
         if (state.userAffirmations.length === 0) {
             content = `
                 <div class="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
                     <h2 class="text-2xl font-serif mb-4">No affirmations yet.</h2>
-                    <p class="mb-6 text-white/80">Visit the library to add your first daily affirmation.</p>
+                    <p class="mb-6 ${colors.secondary}">Visit the library to add your first daily affirmation.</p>
                     <a href="#/library" aria-label="Go to Library to add affirmations">${renderButton(`${ICONS.PlusCircle({className: 'inline-block mr-2', size: 20})} Add Affirmation`)}</a>
                 </div>
             `;
@@ -1429,7 +1467,7 @@
             const randomAffirmation = state.userAffirmations[Math.floor(Math.random() * state.userAffirmations.length)];
             content = `
                 <div class="flex flex-col h-[calc(100vh-12rem)] items-center justify-center text-center">
-                    <h1 class="text-2xl font-serif mb-8 text-white/80">Today's Affirmation</h1>
+                    <h1 class="text-2xl font-serif mb-8 ${colors.secondary}">Today's Affirmation</h1>
                     <p class="text-4xl md:text-5xl font-serif leading-tight">"${randomAffirmation.text}"</p>
                 </div>
             `;
@@ -1438,13 +1476,14 @@
     };
 
     const renderLibrary = () => {
+        const colors = getTextColorClasses();
         const content = `
             <div id="library-view">
                 <h1 class="text-4xl font-serif text-center mb-6">Library</h1>
-                <div class="flex justify-center mb-6 border-b-2 border-white/20">
-                    <button data-action="library-tab" data-tab="curated" class="px-4 py-2 transition-colors text-white border-b-2 border-teal">Discover</button>
-                    <button data-action="library-tab" data-tab="my-mantras" class="px-4 py-2 transition-colors text-white/60 border-b-2 border-transparent">My Mantras (${state.userMantras.length})</button>
-                    <button data-action="library-tab" data-tab="my-affirmations" class="px-4 py-2 transition-colors text-white/60 border-b-2 border-transparent">My Affirmations (${state.userAffirmations.length})</button>
+                <div class="flex justify-center mb-6 border-b-2 ${colors.border}">
+                    <button data-action="library-tab" data-tab="curated" class="px-4 py-2 transition-colors border-b-2 border-teal">Discover</button>
+                    <button data-action="library-tab" data-tab="my-mantras" class="px-4 py-2 transition-colors ${colors.tertiary} border-b-2 border-transparent">My Mantras (${state.userMantras.length})</button>
+                    <button data-action="library-tab" data-tab="my-affirmations" class="px-4 py-2 transition-colors ${colors.tertiary} border-b-2 border-transparent">My Affirmations (${state.userAffirmations.length})</button>
                 </div>
                 <div id="library-content"></div>
             </div>`;
@@ -1456,7 +1495,7 @@
         const { category = CATEGORIES[0], searchTerm = '', priorityFilter = 'All' } = options;
         const container = document.getElementById('library-content');
         if (!container) return;
-        
+        const colors = getTextColorClasses();
         const showAiFeatures = isAnyAiFeatureEnabled();
 
         let content = '';
@@ -1479,13 +1518,13 @@
             content = `
                 ${aiGenerateButton}
                 <div class="relative mb-4">
-                    <input type="search" id="mantra-search-input" value="${searchTerm}" placeholder="Search in ${category}..." class="w-full bg-white/10 rounded-full py-2 pl-10 pr-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white">
-                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">
+                    <input type="search" id="mantra-search-input" value="${searchTerm}" placeholder="Search in ${category}..." class="w-full ${colors.bgMuted} rounded-full py-2 pl-10 pr-4 ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 opacity-50">
                         ${ICONS.Search({ size: 20 })}
                     </div>
                 </div>
                 <div class="flex flex-wrap justify-center gap-2 mb-4">
-                    ${CATEGORIES.map(cat => `<button data-action="library-filter" data-category="${cat}" class="px-3 py-1 text-sm rounded-full transition-colors ${category === cat ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}" aria-label="Filter by ${cat}" title="Filter by ${cat}">${cat}</button>`).join('')}
+                    ${CATEGORIES.map(cat => `<button data-action="library-filter" data-category="${cat}" class="px-3 py-1 text-sm rounded-full transition-colors ${category === cat ? 'bg-white text-deep-purple font-semibold' : `${colors.bgMuted20}`}" aria-label="Filter by ${cat}" title="Filter by ${cat}">${cat}</button>`).join('')}
                 </div>
                 <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
                 ${mantras.length > 0 ? mantras.map(mantra => {
@@ -1493,20 +1532,20 @@
                     return `
                     <div class="glass-card p-4 flex justify-between items-center">
                         <p class="flex-grow">"${getMantraText(mantra)}"</p>
-                        <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="ml-4 p-2 rounded-full transition-colors ${isAdded ? 'bg-teal text-white' : 'bg-white/20 hover:bg-white/30'}" aria-label="${isAdded ? 'Remove this mantra from your list' : 'Add this mantra to your list'}" title="${isAdded ? 'Remove from My Mantras' : 'Add to My Mantras'}">
+                        <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="ml-4 p-2 rounded-full transition-colors ${isAdded ? 'bg-teal text-white' : `${colors.bgMuted20} ${colors.bgHover30}`}" aria-label="${isAdded ? 'Remove this mantra from your list' : 'Add this mantra to your list'}" title="${isAdded ? 'Remove from My Mantras' : 'Add to My Mantras'}">
                             ${isAdded ? ICONS.Check({ size: 16 }) : ICONS.Plus({ size: 16 })}
                         </button>
                     </div>`;
-                }).join('') : `<div class="text-center p-8"><p class="text-white/80">No mantras found for your search.</p></div>`}
+                }).join('') : `<div class="text-center p-8"><p class="${colors.secondary}">No mantras found for your search.</p></div>`}
                 </div>
             `;
         } else if (tab === 'my-mantras') {
             if (state.userMantras.length === 0) {
-                content = `<div class="text-center p-8"><p class="text-white/80">You haven't added any mantras yet. Explore the 'Discover' tab!</p></div>`;
+                content = `<div class="text-center p-8"><p class="${colors.secondary}">You haven't added any mantras yet. Explore the 'Discover' tab!</p></div>`;
             } else {
                 const priorityButtons = ['All', ...PRIORITY_LEVELS].map(p => {
                     const isActive = priorityFilter === p;
-                    return `<button data-action="library-priority-filter" data-priority="${p}" class="px-3 py-1 text-sm rounded-full transition-colors ${isActive ? 'bg-white text-deep-purple font-semibold' : 'bg-white/20 text-white'}" aria-label="Filter by ${p} priority" title="Filter by ${p} priority">${p}</button>`;
+                    return `<button data-action="library-priority-filter" data-priority="${p}" class="px-3 py-1 text-sm rounded-full transition-colors ${isActive ? 'bg-white text-deep-purple font-semibold' : `${colors.bgMuted20}`}" aria-label="Filter by ${p} priority" title="Filter by ${p} priority">${p}</button>`;
                 }).join('');
 
                 const filteredMantras = priorityFilter === 'All'
@@ -1533,8 +1572,8 @@
                         ${priorityButtons}
                     </div>
                     <div class="flex justify-center items-center mb-4">
-                        <label for="mantra-sort-select" class="text-sm text-white/70 mr-2">Sort by:</label>
-                        <select id="mantra-sort-select" data-action="set-mantra-sort" class="bg-white/10 rounded-md py-1 px-2 text-white focus:outline-none focus:ring-2 focus:ring-white">
+                        <label for="mantra-sort-select" class="text-sm ${colors.secondary} mr-2">Sort by:</label>
+                        <select id="mantra-sort-select" data-action="set-mantra-sort" class="${colors.bgMuted} rounded-md py-1 px-2 focus:outline-none focus:ring-2 ${colors.ring}">
                             <option value="date-desc" ${myMantrasSortOrder === 'date-desc' ? 'selected' : ''}>Newest First</option>
                             <option value="date-asc" ${myMantrasSortOrder === 'date-asc' ? 'selected' : ''}>Oldest First</option>
                             <option value="priority-desc" ${myMantrasSortOrder === 'priority-desc' ? 'selected' : ''}>Priority (High to Low)</option>
@@ -1546,7 +1585,7 @@
                         const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
                         const canRewrite = isAnyAiFeatureEnabled();
                         const rephraseButton = canRewrite ? `
-                            <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
+                            <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30} flex-shrink-0" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
                                 ${ICONS.Wand2({ size: 16 })}
                             </button>
                         ` : '';
@@ -1557,53 +1596,53 @@
                                 <p class="pr-4 flex-grow">"${getMantraText(mantra)}"</p>
                                 <div class="flex gap-2">
                                     ${rephraseButton}
-                                    <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="p-2 rounded-full bg-white/20 hover:bg-white/30 flex-shrink-0" aria-label="Remove this mantra" title="Remove mantra">
+                                    <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30} flex-shrink-0" aria-label="Remove this mantra" title="Remove mantra">
                                         ${ICONS.Trash2({ size: 16 })}
                                     </button>
                                 </div>
                             </div>
-                            <div class="mt-3 pt-3 border-t border-white/10">
+                            <div class="mt-3 pt-3 border-t ${colors.border}">
                                 <div id="audio-controls-${mantra.id}" class="mb-3">
                                     ${renderAudioInterface(mantra.id)}
                                 </div>
                                 <div class="flex items-center justify-between">
                                      <div class="flex items-center gap-2">
-                                        <span class="text-xs bg-white/10 px-2 py-0.5 rounded-full">${mantra.category}</span>
+                                        <span class="text-xs ${colors.bgMuted} px-2 py-0.5 rounded-full">${mantra.category}</span>
                                         <span class="text-xs px-2 py-0.5 rounded-full ${priorityColor} font-semibold text-white">${mantra.priority}</span>
                                      </div>
                                     <div class="flex items-center gap-2">
                                         ${PRIORITY_LEVELS.map(p => `
-                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : 'bg-white/20 hover:bg-white/30'}" aria-label="Set priority to ${p}" title="Set priority to ${p}">${p}</button>
+                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : `${colors.bgMuted20} ${colors.bgHover30}`}" aria-label="Set priority to ${p}" title="Set priority to ${p}">${p}</button>
                                         `).join('')}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        `}).join('') : `<div class="text-center p-8"><p class="text-white/80">No mantras found with this priority.</p></div>`}
+                        `}).join('') : `<div class="text-center p-8"><p class="${colors.secondary}">No mantras found with this priority.</p></div>`}
                     </div>`;
             }
             const canProofread = state.settings.aiFeatures.enabled && (state.aiStatus.proofreader || state.settings.demoMode.enabled);
             const canSuggest = state.settings.aiFeatures.enabled && (state.aiStatus.text || state.settings.demoMode.enabled);
             content += `
-                <div class="mt-6 border-t border-white/20 pt-4">
+                <div class="mt-6 border-t ${colors.border} pt-4">
                     <h3 class="text-lg font-semibold text-center mb-3">Create Your Own Mantra</h3>
                     <div class="space-y-3">
-                        <textarea id="new-custom-mantra-text" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white resize-none" placeholder="e.g., I am resilient and strong." maxlength="150" rows="3"></textarea>
-                        <div id="new-mantra-char-count" class="text-right text-xs text-white/60">0/150</div>
+                        <textarea id="new-custom-mantra-text" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} resize-none" placeholder="e.g., I am resilient and strong." maxlength="150" rows="3"></textarea>
+                        <div id="new-mantra-char-count" class="text-right text-xs ${colors.tertiary}">0/150</div>
                         <div id="proofread-suggestion" class="hidden text-sm p-2 bg-teal/20 rounded-lg text-left"></div>
                         <div id="ai-suggestion-container" class="space-y-2"></div>
-                        <select id="new-custom-mantra-category" class="w-full p-3 bg-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white">
+                        <select id="new-custom-mantra-category" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
                             ${CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                         </select>
-                        <select id="new-custom-mantra-priority" class="w-full p-3 bg-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white">
+                        <select id="new-custom-mantra-priority" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
                             <option value="Medium">Medium Priority</option>
                             <option value="High">High Priority</option>
                             <option value="Low">Low Priority</option>
                         </select>
                         <div class="flex gap-2">
-                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Check grammar for the text above" title="Check grammar">${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
-                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Suggest alternative phrasing for the text above" title="Suggest alternative phrasing">${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
-                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-white/20 text-white hover:bg-white/30 focus:ring-white flex items-center justify-center gap-2" disabled aria-label="Add this new mantra to your list" title="Add new mantra">${ICONS.Plus({size: 20})}<span>Add</span></button>
+                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Check grammar for the text above" title="Check grammar">${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
+                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Suggest alternative phrasing for the text above" title="Suggest alternative phrasing">${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
+                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed ${colors.bgMuted20} ${colors.bgHover30} ${colors.ring} flex items-center justify-center gap-2" disabled aria-label="Add this new mantra to your list" title="Add new mantra">${ICONS.Plus({size: 20})}<span>Add</span></button>
                         </div>
                     </div>
                 </div>
@@ -1623,25 +1662,25 @@
              if (state.userAffirmations.length === 0) {
                 content += `
                     <div class="text-center p-8">
-                        <p class="text-white/80 mb-4">Add your personal affirmations to see them here.</p>
+                        <p class="${colors.secondary} mb-4">Add your personal affirmations to see them here.</p>
                     </div>
                 `;
             } else {
                 content += `<div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">${state.userAffirmations.map(affirmation => `
                     <div class="glass-card p-4 flex justify-between items-center">
                         <p>"${affirmation.text}"</p>
-                        <button data-action="remove-affirmation" data-affirmation-id='${affirmation.id}' class="ml-4 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Remove this affirmation" title="Remove affirmation">
+                        <button data-action="remove-affirmation" data-affirmation-id='${affirmation.id}' class="ml-4 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Remove this affirmation" title="Remove affirmation">
                            ${ICONS.Trash2({ size: 16 })}
                         </button>
                     </div>`).join('')}</div>`;
             }
             content += `
-                <div class="mt-6 border-t border-white/20 pt-4">
+                <div class="mt-6 border-t ${colors.border} pt-4">
                     <h3 class="text-lg font-semibold text-center mb-3">Add a New Affirmation</h3>
                     <div class="space-y-2">
-                        <textarea id="new-affirmation-input" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white resize-none" placeholder="e.g., I am confident and capable." maxlength="150" rows="3"></textarea>
+                        <textarea id="new-affirmation-input" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} resize-none" placeholder="e.g., I am confident and capable." maxlength="150" rows="3"></textarea>
                         <div class="flex justify-between items-center">
-                            <span id="char-count" class="text-xs text-white/60">0/150</span>
+                            <span id="char-count" class="text-xs ${colors.tertiary}">0/150</span>
                             ${renderButton('Add Affirmation', { variant: 'secondary', attributes: 'data-action="add-new-affirmation" id="add-affirmation-btn" disabled' })}
                         </div>
                     </div>
@@ -1655,9 +1694,9 @@
         document.querySelectorAll('[data-action="library-tab"]').forEach(btn => {
             const isSelected = btn.dataset.tab === tab;
             btn.classList.toggle('border-teal', isSelected);
-            btn.classList.toggle('text-white', isSelected);
+            btn.classList.toggle(colors.primary, isSelected);
             btn.classList.toggle('border-transparent', !isSelected);
-            btn.classList.toggle('text-white/60', !isSelected);
+            btn.classList.toggle(colors.tertiary, !isSelected);
         });
     };
 
@@ -1667,6 +1706,7 @@
         const longestStreak = getLongestStreak();
         const mostViewedMantra = Object.entries(state.progress).sort(([,a],[,b]) => b.views - a.views)[0];
         let mostViewedText = 'No views yet.';
+        const colors = getTextColorClasses();
         if (mostViewedMantra) {
             const mantra = state.userMantras.find(m => m.id === mostViewedMantra[0]) || CURATED_MANTRAS.find(m => m.id === mostViewedMantra[0]);
             if (mantra) mostViewedText = `"${getMantraText(mantra)}" (${mostViewedMantra[1].views} views)`;
@@ -1677,21 +1717,21 @@
                 <h1 class="text-4xl font-serif text-center mb-6">Your Progress</h1>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm text-white/70">Total Views</p><p class="text-2xl font-bold">${totalViews}</p></div>
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm text-white/70">Current Streak</p><p class="text-2xl font-bold">${streak} Days</p></div>
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm text-white/70">Longest Streak</p><p class="text-2xl font-bold">${longestStreak} Days</p></div>
+                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Total Views</p><p class="text-2xl font-bold">${totalViews}</p></div>
+                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Current Streak</p><p class="text-2xl font-bold">${streak} Days</p></div>
+                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Longest Streak</p><p class="text-2xl font-bold">${longestStreak} Days</p></div>
                 </div>
-                <div class="glass-card p-4 rounded-xl mb-6"><p class="text-sm text-white/70">Most Frequent Mantra</p><p class="font-semibold">${mostViewedText}</p></div>
+                <div class="glass-card p-4 rounded-xl mb-6"><p class="text-sm ${colors.secondary}">Most Frequent Mantra</p><p class="font-semibold">${mostViewedText}</p></div>
 
                 <div class="glass-card p-4 rounded-xl mb-6">
                     <h2 class="text-xl font-semibold mb-4 text-center">Achievements (${state.achievements.filter(a=>a.unlocked).length}/${state.achievements.length})</h2>
                     <div class="space-y-3">
                     ${state.achievements.map(a => `
                         <div class="flex items-center gap-4 ${a.unlocked ? '' : 'opacity-50'}">
-                            <div class="p-2 rounded-full ${a.unlocked ? 'bg-gold' : 'bg-white/20'}">${ICONS.Award({ color: a.unlocked ? '#fff' : 'currentColor' })}</div>
+                            <div class="p-2 rounded-full ${a.unlocked ? 'bg-gold' : `${colors.bgMuted20}`}">${ICONS.Award({ color: a.unlocked ? '#fff' : 'currentColor' })}</div>
                             <div>
                                 <p class="font-semibold">${a.title}</p>
-                                <p class="text-sm text-white/70">${a.description}</p>
+                                <p class="text-sm ${colors.secondary}">${a.description}</p>
                             </div>
                         </div>`).join('')}
                     </div>
@@ -1724,7 +1764,7 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
             const daysOfWeekHeaders = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => 
-                `<div class="text-center text-xs text-white/60 font-semibold">${day}</div>`
+                `<div class="text-center text-xs ${colors.tertiary} font-semibold">${day}</div>`
             ).join('');
 
             let calendarCells = Array.from({ length: startingDayOfWeek }, () => '<div></div>').join('');
@@ -1736,21 +1776,21 @@
                 const wasViewed = viewedDates.has(dateStr);
                 
                 let cellClasses = 'w-8 h-8 flex items-center justify-center rounded-full text-xs transition-colors ';
-                if (isToday) cellClasses += 'ring-2 ring-white ';
-                if (wasViewed) cellClasses += 'bg-teal ';
-                else cellClasses += 'bg-white/10 ';
+                if (isToday) cellClasses += `ring-2 ${colors.needsDarkText ? 'ring-charcoal' : 'ring-white'} `;
+                if (wasViewed) cellClasses += 'bg-teal text-white ';
+                else cellClasses += `${colors.bgMuted} `;
                 
                 calendarCells += `<div class="${cellClasses}">${day}</div>`;
             }
 
             calendarContainer.innerHTML = `
                 <div class="flex justify-between items-center mb-4">
-                    <button data-action="prev-month" class="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Previous month" title="Previous month">${ICONS.ArrowLeft({size: 20})}</button>
+                    <button data-action="prev-month" class="p-2 rounded-full ${colors.bgHover} transition-colors" aria-label="Previous month" title="Previous month">${ICONS.ArrowLeft({size: 20})}</button>
                     <div class="text-center">
                          <h2 class="text-xl font-semibold text-center">${monthName} ${yearNum}</h2>
-                         <button data-action="calendar-today" class="text-xs text-teal hover:underline">Go to Today</button>
+                         <button data-action="calendar-today" class="text-xs ${colors.accent} hover:underline">Go to Today</button>
                     </div>
-                    <button data-action="next-month" class="p-2 rounded-full hover:bg-white/20 transition-colors" aria-label="Next month" title="Next month">${ICONS.ArrowRight({size: 20})}</button>
+                    <button data-action="next-month" class="p-2 rounded-full ${colors.bgHover} transition-colors" aria-label="Next month" title="Next month">${ICONS.ArrowRight({size: 20})}</button>
                 </div>
                 <div class="grid grid-cols-7 gap-y-2 place-items-center mt-2">
                     ${daysOfWeekHeaders}
@@ -1783,16 +1823,17 @@
     const renderSettings = () => {
         const s = state.settings;
         const n = s.notifications;
+        const colors = getTextColorClasses();
 
         const renderTimeSlot = (period) => {
             const setting = n.mantras[period]; // { enabled: bool, time: 'HH:mm' }
             return `
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-2">
-                        <input type="checkbox" id="notif-${period}-enabled" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="enabled" ${setting.enabled ? 'checked' : ''} class="accent-teal h-5 w-5 rounded">
+                        <input type="checkbox" id="notif-${period}-enabled" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="enabled" ${setting.enabled ? 'checked' : ''} class="${colors.accentCheckbox} h-5 w-5 rounded">
                         <label for="notif-${period}-enabled" class="capitalize">${period}</label>
                     </div>
-                    <input type="time" value="${setting.time}" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="time" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm w-24" ${!setting.enabled ? 'disabled' : ''}>
+                    <input type="time" value="${setting.time}" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="time" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm w-24" ${!setting.enabled ? 'disabled' : ''}>
                 </div>`;
         };
 
@@ -1803,7 +1844,7 @@
                     <h3 class="font-semibold mb-2">Default AI Parameters</h3>
                     <div class="flex justify-between items-center text-sm">
                         <label for="ai-default-creativity">Creativity</label>
-                        <select id="ai-default-creativity" data-action="set-ai-setting" data-key="creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                        <select id="ai-default-creativity" data-action="set-ai-setting" data-key="creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                             <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
                             <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
                             <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
@@ -1811,7 +1852,7 @@
                     </div>
                      <div class="flex justify-between items-center text-sm">
                         <label for="ai-default-tone">Tone</label>
-                        <select id="ai-default-tone" data-action="set-ai-setting" data-key="tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                        <select id="ai-default-tone" data-action="set-ai-setting" data-key="tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                             <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
                             <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
                             <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
@@ -1820,7 +1861,7 @@
                     </div>
                      <div class="flex justify-between items-center text-sm">
                         <label for="ai-default-length">Length</label>
-                        <select id="ai-default-length" data-action="set-ai-setting" data-key="length" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                        <select id="ai-default-length" data-action="set-ai-setting" data-key="length" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                             <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
                             <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
                             <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
@@ -1854,7 +1895,7 @@
               </div>
 
               <div class="mt-3 p-3 bg-blue-500/20 rounded-lg">
-                <p class="text-xs text-white/80">
+                <p class="text-xs ${colors.secondary}">
                   <strong>Status:</strong> ${state.aiStatus.supported ? 'On-device AI detected.' : 'On-device AI not detected in your browser.'}
                   ${!state.aiStatus.supported ? ' Enable demo mode to simulate these features.' : ''}
                 </p>
@@ -1866,41 +1907,41 @@
             <div class="glass-card p-4 rounded-xl mb-4">
                 <div class="flex justify-between items-center">
                     <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Sparkles({size: 20})} AI & Demo Mode</h2>
-                    <button data-action="toggle-ai-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.aiFeatures.enabled ? 'bg-teal' : 'bg-white/20'}">
+                    <button data-action="toggle-ai-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.aiFeatures.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
                         <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.aiFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                     </button>
                 </div>
                 
                 ${s.aiFeatures.enabled ? `
-                <div class="mt-3 pt-3 border-t border-white/20 space-y-3">
+                <div class="mt-3 pt-3 border-t ${colors.border} space-y-3">
                     ${AIStatusPanel}
 
                     ${renderAiDefaultParamControls()}
 
                     <div class="flex justify-between items-center">
                         <label for="language-select" class="flex items-center gap-2 text-sm">${ICONS.Languages({size: 16})} Language</label>
-                        <select id="language-select" data-action="set-language" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                        <select id="language-select" data-action="set-language" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                             ${Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => `<option value="${code}" ${s.language === code ? 'selected' : ''}>${name}</option>`).join('')}
                         </select>
                     </div>
                     
-                    <div class="flex justify-between items-center pt-3 border-t border-white/20">
+                    <div class="flex justify-between items-center pt-3 border-t ${colors.border}">
                         <div class="text-sm">
                             <p class="font-semibold">Demo Mode</p>
-                            <p class="text-white/70 text-xs">Simulate AI features if unavailable.</p>
+                            <p class="${colors.secondary} text-xs">Simulate AI features if unavailable.</p>
                         </div>
-                        <button data-action="toggle-demo-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.demoMode.enabled ? 'bg-teal' : 'bg-white/20'}">
+                        <button data-action="toggle-demo-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.demoMode.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.demoMode.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
                     
-                    <div class="text-xs text-white/60 p-2 bg-black/20 rounded-lg">
+                    <div class="text-xs ${colors.tertiary} p-2 bg-black/20 rounded-lg">
                         <p class="font-bold">Browser Info:</p>
                         <p class="break-all">${navigator.userAgent}</p>
                     </div>
                 </div>
                 ` : `
-                <p class="text-sm text-white/70 mt-2">Enable to use on-device AI for generation, translation, and more.</p>
+                <p class="text-sm ${colors.secondary} mt-2">Enable to use on-device AI for generation, translation, and more.</p>
                 `}
             </div>
         `;
@@ -1915,7 +1956,7 @@
                     <h2 class="text-lg font-semibold mb-3">Theme</h2>
                     <div class="grid grid-cols-2 gap-3">
                         ${THEME_OPTIONS.map(theme => `
-                            <button data-action="set-theme" data-theme="${theme.id}" class="w-full h-16 rounded-lg border-2 ${s.theme === theme.id ? 'border-white' : 'border-transparent'}" style="background-image: ${theme.gradient};" aria-label="Set theme to ${theme.name}" title="Set theme to ${theme.name}">
+                            <button data-action="set-theme" data-theme="${theme.id}" class="w-full h-16 rounded-lg border-2 ${s.theme === theme.id ? (colors.needsDarkText ? 'border-charcoal' : 'border-white') : 'border-transparent'}" style="background-image: ${theme.gradient};" aria-label="Set theme to ${theme.name}" title="Set theme to ${theme.name}">
                                 <span class="sr-only">${theme.name}</span>
                             </button>
                         `).join('')}
@@ -1925,13 +1966,13 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <h2 class="text-lg font-semibold mb-3">Font Style</h2>
                      <div class="flex gap-3">
-                        ${FONT_OPTIONS.map(font => `<button data-action="set-font" data-font="${font.id}" class="flex-1 p-3 rounded-lg text-center ${s.font === font.id ? 'bg-white text-deep-purple' : 'bg-white/20'}" aria-label="Set font to ${font.name}" title="Set font to ${font.name}">${font.name}</button>`).join('')}
+                        ${FONT_OPTIONS.map(font => `<button data-action="set-font" data-font="${font.id}" class="flex-1 p-3 rounded-lg text-center ${s.font === font.id ? 'bg-white text-deep-purple' : `${colors.bgMuted20}`}" aria-label="Set font to ${font.name}" title="Set font to ${font.name}">${font.name}</button>`).join('')}
                     </div>
                 </div>
                 
                 <div class="glass-card p-4 rounded-xl mb-4 flex justify-between items-center">
                     <h2 class="text-lg font-semibold">Dark Mode</h2>
-                    <button data-action="toggle-dark-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.isDarkMode ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle dark mode" title="Toggle dark mode">
+                    <button data-action="toggle-dark-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.isDarkMode ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle dark mode" title="Toggle dark mode">
                         <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.isDarkMode ? 'translate-x-6' : 'translate-x-0'}"></span>
                     </button>
                 </div>
@@ -1939,15 +1980,15 @@
                  <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Timer({size: 20})} Slideshow</h2>
-                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle slideshow mode" title="Toggle slideshow mode">
+                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle slideshow mode" title="Toggle slideshow mode">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.slideshow.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
                      ${s.slideshow.enabled ? `
-                    <div class="text-sm mt-3 pt-3 border-t border-white/20">
+                    <div class="text-sm mt-3 pt-3 border-t ${colors.border}">
                          <div class="flex justify-between items-center">
                             <label for="slideshow-interval">Display each mantra for</label>
-                            <select id="slideshow-interval" data-action="set-slideshow-interval" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <select id="slideshow-interval" data-action="set-slideshow-interval" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                 <option value="5" ${s.slideshow.interval === 5 ? 'selected' : ''}>5 seconds</option>
                                 <option value="6" ${s.slideshow.interval === 6 ? 'selected' : ''}>6 seconds</option>
                                 <option value="7" ${s.slideshow.interval === 7 ? 'selected' : ''}>7 seconds</option>
@@ -1956,13 +1997,13 @@
                                 <option value="30" ${s.slideshow.interval === 30 ? 'selected' : ''}>30 seconds</option>
                             </select>
                         </div>
-                    </div>` : '<p class="text-sm text-white/70 mt-2">Enable to automatically cycle through your mantras on the dashboard.</p>'}
+                    </div>` : `<p class="text-sm ${colors.secondary} mt-2">Enable to automatically cycle through your mantras on the dashboard.</p>`}
                 </div>
 
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Microphone({size: 20})} Voice Features</h2>
-                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : 'bg-white/20'}" ${!isAudioSupported ? 'disabled' : ''} aria-label="Toggle voice recording features" title="Toggle voice recording features">
+                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" ${!isAudioSupported ? 'disabled' : ''} aria-label="Toggle voice recording features" title="Toggle voice recording features">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.voiceFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1972,7 +2013,7 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Music4({size: 20})} Celebration Sounds</h2>
-                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle celebration sounds" title="Toggle celebration sounds">
+                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle celebration sounds" title="Toggle celebration sounds">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.celebrationSounds.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
@@ -1981,42 +2022,42 @@
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Vibrate({size: 20})} Haptic Feedback</h2>
-                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle haptic feedback" title="Toggle haptic feedback">
+                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle haptic feedback" title="Toggle haptic feedback">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.haptics.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
-                     <p class="text-sm text-white/70 mt-2">Enable subtle vibrations for actions like swiping and button presses.</p>
+                     <p class="text-sm ${colors.secondary} mt-2">Enable subtle vibrations for actions like swiping and button presses.</p>
                 </div>
 
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Bell({size: 20})} Mantra Reminders</h2>
-                        <button data-action="set-notification-prop" data-type="mantras" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.mantras.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle mantra reminders" title="Toggle mantra reminders">
+                        <button data-action="set-notification-prop" data-type="mantras" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.mantras.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle mantra reminders" title="Toggle mantra reminders">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.mantras.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
                     ${n.mantras.enabled ? `
-                    <div class="text-sm space-y-3 pt-2 border-t border-white/20">
+                    <div class="text-sm space-y-3 pt-2 border-t ${colors.border}">
                         ${renderTimeSlot('morning')}
                         ${renderTimeSlot('afternoon')}
                         ${renderTimeSlot('evening')}
-                    </div>` : '<p class="text-sm text-white/70">Enable to get motivational mantra reminders.</p>'}
+                    </div>` : `<p class="text-sm ${colors.secondary}">Enable to get motivational mantra reminders.</p>`}
                 </div>
 
                 <div class="glass-card p-4 rounded-xl mb-4">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Smile({size: 20})} Daily Affirmation Reminder</h2>
-                        <button data-action="set-notification-prop" data-type="affirmation" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.affirmation.enabled ? 'bg-teal' : 'bg-white/20'}" aria-label="Toggle daily affirmation reminder" title="Toggle daily affirmation reminder">
+                        <button data-action="set-notification-prop" data-type="affirmation" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.affirmation.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle daily affirmation reminder" title="Toggle daily affirmation reminder">
                             <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.affirmation.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
                         </button>
                     </div>
                     ${n.affirmation.enabled ? `
-                    <div class="text-sm pt-2 border-t border-white/20">
+                    <div class="text-sm pt-2 border-t ${colors.border}">
                         <div class="flex justify-between items-center">
                             <label for="notif-affirmation-time">Reminder time</label>
-                            <input type="time" id="notif-affirmation-time" value="${n.affirmation.time}" data-action="set-notification-prop" data-type="affirmation" data-prop="time" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm w-24">
+                            <input type="time" id="notif-affirmation-time" value="${n.affirmation.time}" data-action="set-notification-prop" data-type="affirmation" data-prop="time" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm w-24">
                         </div>
-                    </div>` : '<p class="text-sm text-white/70">Enable to get a daily affirmation reminder.</p>'}
+                    </div>` : `<p class="text-sm ${colors.secondary}">Enable to get a daily affirmation reminder.</p>`}
                 </div>
 
                  ${deferredInstallPrompt ? `
@@ -2027,14 +2068,14 @@
                  <div class="glass-card p-4 rounded-xl mb-4">
                     <h2 class="text-lg font-semibold mb-3">Data Management</h2>
                     <div class="flex justify-between items-baseline mb-4 p-3 rounded-lg bg-black/10">
-                        <span class="text-sm text-white/80">Voice Recordings Storage Used:</span>
+                        <span class="text-sm ${colors.secondary}">Voice Recordings Storage Used:</span>
                         <span class="text-lg font-bold text-teal">${getAudioStorageUsage()}</span>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <button data-action="export-data" class="flex-1 p-3 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center justify-center gap-2" title="Export all your data to a JSON file">
+                        <button data-action="export-data" class="flex-1 p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} transition-colors flex items-center justify-center gap-2" title="Export all your data to a JSON file">
                             ${ICONS.Download({size: 20})} Export Data
                         </button>
-                        <button data-action="import-data" class="flex-1 p-3 rounded-lg bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center justify-center gap-2" title="Import data from a JSON backup file">
+                        <button data-action="import-data" class="flex-1 p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} transition-colors flex items-center justify-center gap-2" title="Import data from a JSON backup file">
                             ${ICONS.Upload({size: 20})} Import Data
                         </button>
                         <input type="file" id="import-file-input" class="hidden" accept=".json">
@@ -2865,8 +2906,8 @@
         if (!contentContainer) return;
 
         contentContainer.innerHTML = `
-            <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-white/80">Analyzing audio and generating mantras...</p>`;
+            <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="opacity-80">Analyzing audio and generating mantras...</p>`;
 
         const isDemo = state.settings.demoMode.enabled && !state.aiStatus.assistant;
         
@@ -2904,11 +2945,11 @@
                     <div class="relative flex items-center justify-center w-20 h-20">
                         <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
                         <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
-                        <button id="ai-stop-recording-btn" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg" aria-label="Stop recording">
+                        <button id="ai-stop-recording-btn" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg text-white" aria-label="Stop recording">
                             ${ICONS.StopCircle({size: 24})}
                         </button>
                     </div>
-                    <div id="ai-audio-timer" class="text-lg font-mono text-white/80 font-semibold">${MAX_AI_RECORDING_SECONDS}s left</div>
+                    <div id="ai-audio-timer" class="text-lg font-mono opacity-80 font-semibold">${MAX_AI_RECORDING_SECONDS}s left</div>
                 </div>
             `;
             document.getElementById('ai-stop-recording-btn').addEventListener('click', stopAiTopicRecording);
@@ -2944,7 +2985,7 @@
             if (contentContainer) {
                 contentContainer.innerHTML = `
                     <h2 class="text-2xl font-serif mb-4 text-rose-400">Microphone Error</h2>
-                    <p class="text-white/80 mb-6">Could not access the microphone. Please grant permission and try again.</p>
+                    <p class="opacity-80 mb-6">Could not access the microphone. Please grant permission and try again.</p>
                     ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
                 const modalElement = document.getElementById('ai-generate-modal');
                 const closeModal = () => modalElement?.remove();
@@ -2958,11 +2999,11 @@
         if(!contentContainer) return;
         const modalElement = document.getElementById('ai-generate-modal');
         const closeModal = () => modalElement?.remove();
-
+        const colors = getTextColorClasses();
         if (hasError) {
              contentContainer.innerHTML = `
                 <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                <p class="text-white/80 mb-6">The AI could not process the request. Please try again later.</p>
+                <p class="${colors.secondary} mb-6">The AI could not process the request. Please try again later.</p>
                 ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
             contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
             return;
@@ -2980,7 +3021,7 @@
                 ${mantras.map((mantra) => `
                     <div class="glass-card p-3 flex justify-between items-center">
                         <p>"${mantra}"</p>
-                        <button data-action="add-ai-mantra" data-text="${String(mantra).replace(/ \(Simulated\)$/, '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Add this mantra" title="Add to My Mantras">${ICONS.Plus({size: 16})}</button>
+                        <button data-action="add-ai-mantra" data-text="${String(mantra).replace(/ \(Simulated\)$/, '')}" class="ml-2 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Add this mantra" title="Add to My Mantras">${ICONS.Plus({size: 16})}</button>
                     </div>`).join('')}
                 </div>
                 ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
@@ -2998,7 +3039,7 @@
             console.error("AI Generation failed (parsing result):", error);
             contentContainer.innerHTML = `
                 <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                <p class="text-white/80 mb-6">The AI returned an invalid response. Please try a different topic or try again later.</p>
+                <p class="${colors.secondary} mb-6">The AI returned an invalid response. Please try a different topic or try again later.</p>
                 ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
             contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
         }
@@ -3009,31 +3050,32 @@
         const modalId = 'ai-generate-modal';
         const { creativity, tone, length } = state.settings.aiSettings;
         const canRecord = state.aiStatus.assistant || (state.settings.demoMode.enabled && !state.aiStatus.assistant);
+        const colors = getTextColorClasses();
 
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up" id="ai-generate-content">
                     <h2 class="text-2xl font-serif mb-4 text-center">Generate Mantras</h2>
-                    <p class="text-white/80 mb-4 text-center">What area of your life would you like to focus on?</p>
-                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white">
+                    <p class="${colors.secondary} mb-4 text-center">What area of your life would you like to focus on?</p>
+                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
                     
                     <div class="my-4 flex items-center gap-2">
-                        <hr class="flex-grow border-white/20">
-                        <span class="text-xs text-white/60">OR</span>
-                        <hr class="flex-grow border-white/20">
+                        <hr class="flex-grow ${colors.border}">
+                        <span class="text-xs ${colors.tertiary}">OR</span>
+                        <hr class="flex-grow ${colors.border}">
                     </div>
-                    <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} class="w-full flex items-center justify-center gap-2 p-3 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} class="w-full flex items-center justify-center gap-2 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                         ${ICONS.Microphone({size: 20})}
                         <span>Record Topic</span>
                     </button>
                     ${!canRecord ? '<p class="text-xs text-center text-yellow-300 mt-2">Multimodal audio input is not available in your browser.</p>' : ''}
 
                     <details class="text-left mt-6">
-                        <summary class="cursor-pointer text-sm font-semibold text-white/80">Advanced Options</summary>
+                        <summary class="cursor-pointer text-sm font-semibold ${colors.secondary}">Advanced Options</summary>
                         <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
                              <div class="flex justify-between items-center text-sm">
                                 <label for="ai-generate-creativity">Creativity</label>
-                                <select id="ai-generate-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <select id="ai-generate-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                     <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
                                     <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
                                     <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
@@ -3041,7 +3083,7 @@
                             </div>
                             <div class="flex justify-between items-center text-sm">
                                 <label for="ai-generate-tone">Tone</label>
-                                <select id="ai-generate-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <select id="ai-generate-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                     <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
                                     <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
                                     <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
@@ -3050,7 +3092,7 @@
                             </div>
                             <div class="flex justify-between items-center text-sm">
                                 <label for="ai-generate-length">Length</label>
-                                <select id="ai-generate-length" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <select id="ai-generate-length" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                     <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
                                     <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
                                     <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
@@ -3087,8 +3129,8 @@
 
             const contentContainer = document.getElementById('ai-generate-content');
             contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-white/80">Generating mantras about ${topic}...</p>`;
+                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="opacity-80">Generating mantras about ${topic}...</p>`;
 
             const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
             
@@ -3114,20 +3156,21 @@
     async function handleAiAffirmationGenerate() {
         const modalId = 'ai-affirmation-generate-modal';
         const { creativity, tone, length } = state.settings.aiSettings;
+        const colors = getTextColorClasses();
 
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-md rounded-2xl p-6 text-center animate-slide-in-up" id="ai-affirmation-generate-content">
                     <h2 class="text-2xl font-serif mb-4">Generate Affirmations</h2>
-                    <p class="text-white/80 mb-6">What personal theme would you like to focus on?</p>
-                    <input type="text" id="ai-topic-input" placeholder="e.g., self-love, career success" class="w-full p-3 bg-white/10 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white mb-4">
+                    <p class="${colors.secondary} mb-6">What personal theme would you like to focus on?</p>
+                    <input type="text" id="ai-topic-input" placeholder="e.g., self-love, career success" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} mb-4">
                     
                     <details class="text-left mb-4">
-                        <summary class="cursor-pointer text-sm font-semibold text-white/80">Advanced Options</summary>
+                        <summary class="cursor-pointer text-sm font-semibold ${colors.secondary}">Advanced Options</summary>
                         <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
                              <div class="flex justify-between items-center text-sm">
                                 <label for="ai-generate-creativity">Creativity</label>
-                                <select id="ai-generate-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <select id="ai-generate-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                     <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
                                     <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
                                     <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
@@ -3135,7 +3178,7 @@
                             </div>
                             <div class="flex justify-between items-center text-sm">
                                 <label for="ai-generate-tone">Tone</label>
-                                <select id="ai-generate-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                                <select id="ai-generate-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                     <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
                                     <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
                                 </select>
@@ -3167,8 +3210,8 @@
 
             const contentContainer = document.getElementById('ai-affirmation-generate-content');
             contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-white/80">Generating affirmations about ${topic}...</p>`;
+                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="opacity-80">Generating affirmations about ${topic}...</p>`;
 
             const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
             
@@ -3194,7 +3237,7 @@
                     ${affirmations.map((affirm, index) => `
                         <div class="glass-card p-3 flex justify-between items-center">
                             <p>"${affirm}"</p>
-                            <button data-action="add-ai-affirmation" data-text="${String(affirm).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full bg-white/20 hover:bg-white/30" aria-label="Add this affirmation" title="Add to My Affirmations">${ICONS.Plus({size: 16})}</button>
+                            <button data-action="add-ai-affirmation" data-text="${String(affirm).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Add this affirmation" title="Add to My Affirmations">${ICONS.Plus({size: 16})}</button>
                         </div>`).join('')}
                     </div>
                     ${renderButton('Done', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
@@ -3212,7 +3255,7 @@
                 console.error("AI Affirmation Generation failed:", error);
                 contentContainer.innerHTML = `
                     <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                    <p class="text-white/80 mb-6">The AI could not generate affirmations for this topic. Please try again.</p>
+                    <p class="${colors.secondary} mb-6">The AI could not generate affirmations for this topic. Please try again.</p>
                     ${renderButton('Close', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
                 contentContainer.querySelector('[data-action="close-ai-affirmation-modal-final"]').addEventListener('click', closeModal);
             }
@@ -3226,6 +3269,7 @@
         const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
         const modalId = 'ai-rewrite-modal';
         const { creativity, tone } = state.settings.aiSettings;
+        const colors = getTextColorClasses();
 
         const modalTitle = isDemo 
             ? `Rephrase Mantra <span class="text-sm text-teal-300">(Simulated)</span>` 
@@ -3235,11 +3279,11 @@
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up" id="ai-rewrite-content">
                     <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                    <p class="text-white/70 italic mb-4">"${mantra.text.original}"</p>
+                    <p class="${colors.secondary} italic mb-4">"${mantra.text.original}"</p>
                     <div class="text-left mb-4 p-3 bg-black/20 rounded-lg space-y-3">
                          <div class="flex justify-between items-center text-sm">
                             <label for="ai-rewrite-creativity">Creativity</label>
-                            <select id="ai-rewrite-creativity" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <select id="ai-rewrite-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                 <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
                                 <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
                                 <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
@@ -3247,7 +3291,7 @@
                         </div>
                         <div class="flex justify-between items-center text-sm">
                             <label for="ai-rewrite-tone">Tone</label>
-                            <select id="ai-rewrite-tone" class="bg-white/10 border border-white/20 rounded-md p-1 text-sm">
+                            <select id="ai-rewrite-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
                                 <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
                                 <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
                                 <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
@@ -3256,7 +3300,7 @@
                         </div>
                     </div>
                     ${renderButton('Rephrase', { attributes: 'id="ai-rewrite-submit"'})}
-                    <button class="text-white/70 block w-full text-center mt-3" data-action="close-rewrite-modal">Cancel</button>
+                    <button class="${colors.secondary} block w-full text-center mt-3" data-action="close-rewrite-modal">Cancel</button>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -3269,8 +3313,8 @@
         modal.querySelector('#ai-rewrite-submit').addEventListener('click', async () => {
             const contentContainer = document.getElementById('ai-rewrite-content');
             contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="text-white/80">Rephrasing your mantra...</p>`;
+                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="opacity-80">Rephrasing your mantra...</p>`;
 
             const newCreativity = document.getElementById('ai-rewrite-creativity').value;
             const newTone = document.getElementById('ai-rewrite-tone').value;
@@ -3295,9 +3339,9 @@
                 contentContainer.innerHTML = `
                     <h2 class="text-2xl font-serif mb-4">Choose a New Phrasing</h2>
                     <div class="space-y-3 mb-6">
-                        ${options.map(opt => `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg" data-action="select-rewrite" data-text="${String(opt).replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
+                        ${options.map(opt => `<button class="w-full text-left p-3 ${colors.bgMuted} ${colors.bgHover} rounded-lg" data-action="select-rewrite" data-text="${String(opt).replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
                     </div>
-                    <button class="text-white/70" data-action="close-rewrite-modal">Cancel</button>`;
+                    <button class="${colors.secondary}" data-action="close-rewrite-modal">Cancel</button>`;
                 
                 contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
                 contentContainer.querySelectorAll('[data-action="select-rewrite"]').forEach(btn => {
@@ -3318,7 +3362,7 @@
                 console.error("AI Rewrite failed:", error);
                 contentContainer.innerHTML = `
                     <h2 class="text-2xl font-serif mb-4 text-rose-400">Rewrite Failed</h2>
-                    <p class="text-white/80 mb-6">The AI could not rewrite this mantra. Please try again later.</p>
+                    <p class="${colors.secondary} mb-6">The AI could not rewrite this mantra. Please try again later.</p>
                     ${renderButton('Close', { attributes: 'data-action="close-rewrite-modal"' })}`;
                 contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
             }
@@ -3332,7 +3376,7 @@
 
         const proofreadBtn = document.getElementById('proofread-mantra-btn');
         proofreadBtn.disabled = true;
-        proofreadBtn.innerHTML = `<span class="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin inline-block"></span>`;
+        proofreadBtn.innerHTML = `<span class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin inline-block"></span>`;
         const isDemo = state.settings.demoMode.enabled && !state.aiStatus.proofreader;
 
         try {
@@ -3370,9 +3414,10 @@
 
         const suggestBtn = document.getElementById('suggest-phrasing-btn');
         const suggestionContainer = document.getElementById('ai-suggestion-container');
+        const colors = getTextColorClasses();
         
         suggestBtn.disabled = true;
-        suggestBtn.innerHTML = `<span class="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin inline-block"></span>`;
+        suggestBtn.innerHTML = `<span class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin inline-block"></span>`;
         suggestionContainer.innerHTML = ''; // Clear previous suggestions
 
         const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
@@ -3388,15 +3433,15 @@
             if (suggestions && suggestions.length > 0) {
                 const suggestionHTML = suggestions.map(s => {
                     const cleanText = String(s).replace(' (Simulated)', '');
-                    return `<button class="w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm" data-action="select-suggestion" data-text="${cleanText}">"${s}"</button>`;
+                    return `<button class="w-full text-left p-3 ${colors.bgMuted} ${colors.bgHover} rounded-lg text-sm" data-action="select-suggestion" data-text="${cleanText}">"${s}"</button>`;
                 }).join('');
                 
                 suggestionContainer.innerHTML = `
-                    <h4 class="text-sm font-semibold text-white/80">Suggestions${isDemo ? ' (Simulated)' : ''}:</h4>
+                    <h4 class="text-sm font-semibold ${colors.secondary}">Suggestions${isDemo ? ' (Simulated)' : ''}:</h4>
                     ${suggestionHTML}
                 `;
             } else {
-                suggestionContainer.innerHTML = `<p class="text-sm text-white/60">No suggestions found. Try a different phrasing.</p>`;
+                suggestionContainer.innerHTML = `<p class="text-sm ${colors.tertiary}">No suggestions found. Try a different phrasing.</p>`;
             }
 
         } catch (error) {
