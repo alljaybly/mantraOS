@@ -299,6 +299,7 @@
                     console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Available');
                 } else {
                      console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Unavailable');
+                     renderToast('AI audio input unavailable.');
                 }
             } catch (e) { console.log('[MantraOS AI Diagnostics] assistant.canPrompt: Unavailable', e.message); }
         } else {
@@ -326,7 +327,7 @@
     const FONT_OPTIONS = [ { id: 'font-sans', name: 'Poppins (Modern)'}, { id: 'font-serif', name: 'Playfair (Elegant)'},];
     const SUPPORTED_LANGUAGES = { 'en': 'English', 'es': 'Español', 'fr': 'Français', 'de': 'Deutsch', 'ja': '日本語' };
     const INITIAL_ACHIEVEMENTS = [
-        { id: 'first_view', title: 'First Step', description: 'View your first mantra.', unlocked: false }, { id: '7_day_streak', title: 'Consistent Mind', description: 'View mantras for 7 days in a row.', unlocked: false }, { id: '3_mantras', title: 'Trio of Power', description: 'Select at least 3 mantras.', unlocked: false }, { id: 'custom_mantra', title: 'Your Own Voice', description: 'Create your first custom mantra.', unlocked: false }, { id: '100_views', title: 'Mantra Master', description: 'View mantras 100 times in total.', unlocked: false },
+        { id: 'first_view', title: 'First Step', description: 'View your first mantra.', unlocked: false }, { id: '7_day_streak', title: 'Consistent Mind', description: 'View mantras for 7 days in a row.', unlocked: false }, { id: '3_mantras', title: 'Trio of Power', description: 'Select at least 3 mantras.', unlocked: false }, { id: 'custom_mantra', title: 'Your Own Voice', description: 'Create your first custom mantra.', unlocked: false }, { id: '100_views', title: 'Mantra Master', description: 'View mantras 100 times in total.', unlocked: false }, { id: 'audio_mantra', title: 'Voice of Power', description: 'Generate a mantra using your voice.', unlocked: false },
     ];
     const MAX_RECORDING_SECONDS = 30;
     const MAX_AI_RECORDING_SECONDS = 10;
@@ -382,6 +383,7 @@
             tone: 'inspirational', // inspirational, assertive, gentle, calm
             length: 'medium' // short, medium, long
         },
+        audioInput: { enabled: true },
     };
 
     let state = {
@@ -1924,6 +1926,16 @@
                             ${Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => `<option value="${code}" ${s.language === code ? 'selected' : ''}>${name}</option>`).join('')}
                         </select>
                     </div>
+
+                    <div class="flex justify-between items-center pt-3 border-t ${colors.border}">
+                        <div class="text-sm">
+                            <p class="font-semibold flex items-center gap-2">${ICONS.Microphone({size: 16})} AI Audio Input</p>
+                            <p class="${colors.secondary} text-xs">Use your voice to generate mantras.</p>
+                        </div>
+                        <button data-action="toggle-audio-input" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.audioInput.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
+                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.audioInput.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
                     
                     <div class="flex justify-between items-center pt-3 border-t ${colors.border}">
                         <div class="text-sm">
@@ -2704,6 +2716,12 @@
                     payload: { key: 'aiFeatures.enabled', oldValue: state.settings.aiFeatures.enabled, newValue: !state.settings.aiFeatures.enabled }
                 });
                 break;
+            case 'toggle-audio-input':
+                performAction({
+                    type: 'UPDATE_SETTING',
+                    payload: { key: 'audioInput.enabled', oldValue: state.settings.audioInput.enabled, newValue: !state.settings.audioInput.enabled }
+                });
+                break;
              case 'toggle-demo-mode':
                 performAction({
                     type: 'UPDATE_SETTING',
@@ -2914,14 +2932,18 @@
         try {
             let result;
             if (isDemo) {
-                result = await handleFakeAiGenerate("a spoken topic", state.settings.aiSettings);
+                result = await handleFakeAiGenerate("a spoken demo topic", state.settings.aiSettings);
             } else {
-                const promptResult = await window.ai.assistant.prompt([
-                    { text: 'Transcribe this audio and generate 5 positive affirmations about the spoken topic. The topic might be abstract. The output must be only a valid JSON array of strings, with no other text or markdown.' },
-                    { audio: audioBlob }
-                ]);
-                result = promptResult.text();
+                const promptResult = await window.ai.assistant.prompt(
+                    [
+                        { text: 'Transcribe this audio and generate 5 mantras about the topic spoken. Return the result as a valid JSON array of strings, with no other text or markdown.' },
+                        { audio: audioBlob }
+                    ],
+                    { outputLanguage: 'en' }
+                );
+                result = await promptResult.text();
             }
+            unlockAchievement('audio_mantra');
             displayGeneratedMantras(result, isDemo);
         } catch (error) {
             console.error("AI Audio Processing failed:", error);
@@ -3049,26 +3071,32 @@
     async function handleAiGenerate() {
         const modalId = 'ai-generate-modal';
         const { creativity, tone, length } = state.settings.aiSettings;
-        const canRecord = state.aiStatus.assistant || (state.settings.demoMode.enabled && !state.aiStatus.assistant);
+        const canRecord = (state.aiStatus.assistant || state.settings.demoMode.enabled) && state.settings.audioInput.enabled;
         const colors = getTextColorClasses();
 
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up" id="ai-generate-content">
                     <h2 class="text-2xl font-serif mb-4 text-center">Generate Mantras</h2>
-                    <p class="${colors.secondary} mb-4 text-center">What area of your life would you like to focus on?</p>
-                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
+                    <p class="${colors.secondary} mb-4 text-center">Speak a topic or type it below.</p>
                     
+                    <div class="my-4 flex justify-center">
+                        <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} title="${!canRecord ? 'Audio input unavailable' : 'Record Topic'}" 
+                            class="w-24 h-24 flex items-center justify-center gap-2 p-3 rounded-full bg-teal text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative">
+                            <span class="${canRecord ? 'animate-pulse-ring' : ''} absolute inline-flex h-full w-full rounded-full bg-teal opacity-75" style="animation-duration: 2.5s; animation-iteration-count: infinite;"></span>
+                            <span class="relative">
+                              ${ICONS.Microphone({size: 40})}
+                            </span>
+                        </button>
+                    </div>
+
                     <div class="my-4 flex items-center gap-2">
                         <hr class="flex-grow ${colors.border}">
                         <span class="text-xs ${colors.tertiary}">OR</span>
                         <hr class="flex-grow ${colors.border}">
                     </div>
-                    <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} class="w-full flex items-center justify-center gap-2 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        ${ICONS.Microphone({size: 20})}
-                        <span>Record Topic</span>
-                    </button>
-                    ${!canRecord ? '<p class="text-xs text-center text-yellow-300 mt-2">Multimodal audio input is not available in your browser.</p>' : ''}
+
+                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
 
                     <details class="text-left mt-6">
                         <summary class="cursor-pointer text-sm font-semibold ${colors.secondary}">Advanced Options</summary>
@@ -3382,7 +3410,7 @@
         try {
             const { correctedText } = isDemo
                 ? await handleFakeAiProofread(text)
-                : await (await window.ai.proofreader.create()).proofread(text);
+                : await (await window.ai.proofreader.create()).proofread(text, { outputLanguage: 'en' });
             
             const suggestionContainer = document.getElementById('proofread-suggestion');
             const originalText = correctedText.replace(' (Simulated)', '');
