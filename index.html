@@ -359,6 +359,7 @@
     let undoHistory = [];
     let redoHistory = [];
     let toastTimeout = null;
+    let isRecordingAiTopic = false;
 
 
     const defaultSettings = {
@@ -2051,6 +2052,100 @@
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     };
 
+    const renderAiGenerateModal = () => {
+        const colors = getTextColorClasses();
+        const modalId = 'ai-generate-mantra-modal';
+        document.getElementById(modalId)?.remove();
+
+        let micButtonHTML;
+        if(isRecordingAiTopic) {
+            micButtonHTML = `
+                <div id="ai-mic-button-container" class="flex items-center gap-2">
+                    <button id="ai-mic-button" data-action="stop-ai-topic-recording" class="p-3 bg-rose-500 text-white rounded-full animate-pulse" aria-label="Stop recording topic" title="Stop recording">
+                        ${ICONS.StopCircle({size: 20})}
+                    </button>
+                    <span id="ai-recording-timer" class="font-mono text-sm ${colors.secondary}"></span>
+                </div>
+            `;
+        } else {
+            micButtonHTML = `
+                <div id="ai-mic-button-container">
+                    <button id="ai-mic-button" data-action="start-ai-topic-recording" class="p-3 bg-teal text-white rounded-full" aria-label="Use microphone to provide topic" title="Use microphone">
+                        ${ICONS.Microphone({size: 20})}
+                    </button>
+                </div>
+            `;
+        }
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-serif">Generate with AI</h2>
+                        <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Close">&times;</button>
+                    </div>
+                    <p class="${colors.secondary} mb-4">Enter a topic below, or use the microphone to speak your intention.</p>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="ai-generate-topic" placeholder="e.g., Confidence, Calmness" class="flex-grow ${colors.bgMuted} rounded-full py-2 px-4 ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
+                        ${micButtonHTML}
+                    </div>
+                    
+                    <div class="text-center mb-4">
+                        ${renderButton(`${ICONS.Sparkles({className: 'inline-block mr-2', size: 20})} Generate Mantras`, { attributes: 'data-action="generate-ai-mantras"' })}
+                    </div>
+
+                    <div id="ai-generate-results" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        <!-- Results will be injected here -->
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+
+    const handleGenerateAiMantras = async () => {
+        const topicInput = document.getElementById('ai-generate-topic');
+        const topic = topicInput.value.trim();
+        if (!topic) {
+            renderToast('Please enter or speak a topic.');
+            return;
+        }
+
+        const resultsContainer = document.getElementById('ai-generate-results');
+        resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+        
+        let mantras = [];
+        if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
+            try {
+                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                const { creativity, tone, length } = state.settings.aiSettings;
+                const prompt = `You are an expert in crafting positive affirmations. Generate 5 unique, powerful, first-person mantras about "${topic}". The tone should be ${tone} and the length should be ${length}. Creativity level: ${creativity}. Return only a JSON array of strings, like ["I am...", "I will..."]. Do not include any other text or markdown.`;
+                const result = await aiTextSession.prompt(prompt);
+                mantras = JSON.parse(result.match(/\[.*\]/s)[0]); // Loosely parse JSON from a potentially messy string
+            } catch (e) {
+                console.error('AI Mantra Generation Error:', e);
+                mantras = [`[Demo] I am successful and confident, inspired by ${topic}.`, `[Demo] I embrace the calm and peace that ${topic} brings.`];
+                renderToast('AI failed. Showing demo results.');
+            }
+        } else {
+            await new Promise(r => setTimeout(r, 1000));
+            mantras = [`[Demo] I am a master of ${topic}.`, `[Demo] My life is full of ${topic}.`, `[Demo] I attract positive ${topic} into my life.`];
+        }
+        
+        resultsContainer.innerHTML = mantras.map(mantra => {
+            const isAdded = state.userMantras.some(m => m.text.original.toLowerCase() === mantra.toLowerCase());
+            const disabled = isAdded ? 'disabled' : '';
+            const icon = isAdded ? ICONS.Check({size: 16}) : ICONS.Plus({size: 16});
+            return `<div class="glass-card p-3 flex justify-between items-center">
+                        <span>"${mantra}"</span>
+                        <button data-action="add-generated-mantra" data-text="${encodeURIComponent(mantra)}" class="p-2 bg-teal text-white rounded-full ${isAdded ? 'opacity-50' : ''}" ${disabled}>
+                            ${icon}
+                        </button>
+                    </div>`;
+        }).join('');
+    };
+
     const handleGenerateAiAffirmations = async () => {
         const topicInput = document.getElementById('ai-affirmation-topic');
         const topic = topicInput.value.trim();
@@ -2152,6 +2247,102 @@
         }
     };
     
+    const stopAiTopicRecording = () => {
+        if (aiTopicRecorder && aiTopicRecorder.state === 'recording') {
+            aiTopicRecorder.stop();
+        }
+        clearTimeout(aiTopicRecordingTimer);
+        clearInterval(aiTopicRecordingInterval);
+        aiTopicRecordingTimer = null;
+        aiTopicRecordingInterval = null;
+        isRecordingAiTopic = false;
+    };
+
+    const startAiTopicRecording = async () => {
+        if (!isAnyAiFeatureEnabled() || !state.aiStatus.assistant) {
+            renderToast('AI audio input is not available.');
+            return;
+        }
+        if (isRecordingAiTopic) stopAiTopicRecording();
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            isRecordingAiTopic = true;
+            aiTopicChunks = [];
+            renderAiGenerateModal(); // Re-render to show recording UI
+
+            aiTopicRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+            aiTopicRecorder.ondataavailable = event => {
+                aiTopicChunks.push(event.data);
+            };
+            
+            aiTopicRecorder.onstop = async () => {
+                const audioBlob = new Blob(aiTopicChunks, { type: 'audio/webm' });
+                stream.getTracks().forEach(track => track.stop());
+
+                const topicInput = document.getElementById('ai-generate-topic');
+                const micButton = document.getElementById('ai-mic-button');
+                const micButtonContainer = document.getElementById('ai-mic-button-container');
+                const colors = getTextColorClasses();
+
+                if (topicInput) topicInput.placeholder = 'Transcribing...';
+                if (micButton) micButton.innerHTML = `<div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin"></div>`;
+
+                try {
+                    const audioBuffer = await audioBlob.arrayBuffer();
+                    const result = await window.ai.assistant.prompt({ audio: audioBuffer });
+                    if (topicInput) {
+                        topicInput.value = result;
+                        topicInput.placeholder = 'e.g., Confidence, Calmness';
+                    }
+                    unlockAchievement('audio_mantra');
+                    renderToast('Transcription complete!');
+                } catch (e) {
+                    console.error("AI Transcription error:", e);
+                    renderToast('Could not transcribe audio.');
+                    if (topicInput) topicInput.placeholder = 'e.g., Confidence, Calmness';
+                } finally {
+                    if (micButtonContainer) {
+                        // Restore original mic button
+                        micButtonContainer.innerHTML = `
+                            <button id="ai-mic-button" data-action="start-ai-topic-recording" class="p-3 bg-teal text-white rounded-full" aria-label="Use microphone to provide topic" title="Use microphone">
+                                ${ICONS.Microphone({size: 20})}
+                            </button>
+                        `;
+                    }
+                }
+            };
+
+            aiTopicRecorder.start();
+            
+            // Auto-stop
+            aiTopicRecordingTimer = setTimeout(stopAiTopicRecording, MAX_AI_RECORDING_SECONDS * 1000);
+            
+            // UI Timer update
+            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
+            const timerEl = document.getElementById('ai-recording-timer');
+            if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
+
+            aiTopicRecordingInterval = setInterval(() => {
+                secondsRemaining--;
+                const timerEl = document.getElementById('ai-recording-timer');
+                if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
+                if (secondsRemaining <= 0) clearInterval(aiTopicRecordingInterval);
+            }, 1000);
+
+        } catch (err) {
+            console.error("Error accessing microphone for AI:", err);
+            isRecordingAiTopic = false;
+            renderAiGenerateModal(); // Re-render to show idle state
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                renderModal('Microphone Permission Required', 'Please allow microphone access to use this feature.');
+            } else {
+                renderModal('Microphone Error', 'Could not access the microphone.');
+            }
+        }
+    };
+
     // --- APP ROUTING & INITIALIZATION ---
     const handleHashChange = () => {
         const path = window.location.hash.slice(1) || '/';
@@ -2375,6 +2566,26 @@
                      break;
                 
                 // AI Features
+                case 'open-ai-generate-modal': renderAiGenerateModal(); break;
+                case 'start-ai-topic-recording': startAiTopicRecording(); break;
+                case 'stop-ai-topic-recording': stopAiTopicRecording(); break;
+                case 'generate-ai-mantras': handleGenerateAiMantras(); break;
+                case 'add-generated-mantra': {
+                    const text = decodeURIComponent(target.dataset.text);
+                    const newMantra = {
+                        id: `ai_${Date.now()}`,
+                        text: { original: text, translated: null },
+                        category: 'AI Generated',
+                        priority: 'Medium',
+                        createdAt: Date.now(),
+                        isCustom: true,
+                    };
+                    performAction({ type: 'ADD_MANTRA', payload: newMantra });
+                    renderToast('Mantra added!');
+                    target.innerHTML = ICONS.Check({size: 16});
+                    target.disabled = true;
+                    break;
+                }
                 case 'open-ai-affirmation-modal': renderAiAffirmationModal(); break;
                 case 'generate-ai-affirmations': handleGenerateAiAffirmations(); break;
                 case 'add-generated-affirmation': {
