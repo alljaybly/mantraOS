@@ -350,6 +350,12 @@
     let aiTopicRecordingTimer = null;
     let aiTopicRecordingInterval = null;
 
+    // Onboarding AI Demo Globals
+    let onboardingAiRecorder = null;
+    let onboardingAiChunks = [];
+    let onboardingAiTimer = null;
+    let onboardingAiInterval = null;
+
 
     // --- STATE MANAGEMENT ---
     let deferredInstallPrompt = null;
@@ -1299,6 +1305,73 @@
     };
     
     // --- ONBOARDING VIEWS ---
+    const renderOnboardingAiDemoState = (uiState, data = {}) => {
+        const micContainer = document.getElementById('onboarding-mic-container');
+        const resultContainer = document.getElementById('onboarding-ai-result');
+        if (!micContainer || !resultContainer) return;
+
+        micContainer.innerHTML = '';
+        resultContainer.innerHTML = '';
+
+        switch (uiState) {
+            case 'idle':
+                micContainer.innerHTML = `
+                    <button data-action="start-onboarding-ai-recording" class="p-6 bg-white/20 hover:bg-white/30 rounded-full text-white transition-transform active:scale-95" aria-label="Start recording topic">
+                        ${ICONS.Microphone({size: 32})}
+                    </button>
+                `;
+                break;
+            case 'recording':
+                micContainer.innerHTML = `
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="relative flex items-center justify-center w-20 h-20">
+                            <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
+                            <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
+                            <button data-action="stop-onboarding-ai-recording" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg text-white" aria-label="Stop recording">
+                                ${ICONS.StopCircle({size: 24})}
+                            </button>
+                        </div>
+                        <div id="onboarding-ai-timer" class="text-lg font-mono text-white/80 font-semibold">${MAX_AI_RECORDING_SECONDS}s</div>
+                    </div>
+                `;
+                break;
+            case 'processing':
+                micContainer.innerHTML = `
+                    <div class="flex flex-col items-center gap-2">
+                        <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                        <p class="text-white/80">${data.message || 'Processing...'}</p>
+                    </div>
+                `;
+                break;
+            case 'result':
+                const { mantra, topic } = data;
+                micContainer.innerHTML = `
+                    <div class="flex items-center justify-center gap-2 p-3 bg-white/10 rounded-full">
+                        ${ICONS.CheckCircle({ size: 24, className: 'text-teal' })}
+                        <p class="text-white font-semibold">Mantra Generated!</p>
+                    </div>
+                `;
+                resultContainer.innerHTML = `
+                    <p class="text-white/80">From your topic "${topic}":</p>
+                    <div class="glass-card p-4 text-center">
+                        <p class="text-xl italic">"${mantra}"</p>
+                    </div>
+                    ${renderButton('Add to My Mantras', { attributes: `data-action="open-onboarding-confirmation" data-text="${encodeURIComponent(mantra)}"` })}
+                `;
+                break;
+            case 'error':
+                 micContainer.innerHTML = `
+                    <div class="flex items-center justify-center gap-2 p-3 bg-rose-500/20 rounded-full">
+                        ${ICONS.XCircle({ size: 24, className: 'text-rose-400' })}
+                        <p class="text-rose-300 font-semibold">An Error Occurred</p>
+                    </div>
+                `;
+                resultContainer.innerHTML = `<p class="text-white/80">${data.message || 'Please try again.'}</p>`;
+                setTimeout(() => renderOnboardingAiDemoState('idle'), 3000); // Reset after 3 seconds
+                break;
+        }
+    };
+
     const renderOnboarding = (step) => {
         // Onboarding has a fixed theme, so no dynamic colors needed here.
         let content = '';
@@ -1361,13 +1434,56 @@
                             ${CATEGORIES.filter(c => c !== 'AI Generated').map(cat => `<button class="px-3 py-1 text-sm rounded-full transition-colors bg-white/20 text-white" data-action="filter-mantras" data-category="${cat}">${cat}</button>`).join('')}
                         </div>
                         <div class="h-64 overflow-y-auto pr-2 space-y-3 mb-6" id="mantra-list"></div>
-                        ${renderButton(`Next (${selectionCount} selected)`, { attributes: `data-action="nav" data-path="/onboarding/custom" ${isNextDisabled ? 'disabled' : ''}`})}
+                        ${renderButton(`Next (${selectionCount} selected)`, { attributes: `data-action="nav" data-path="/onboarding/ai-intro" ${isNextDisabled ? 'disabled' : ''}`})}
                         <p class="text-sm mt-2 font-medium transition-colors ${feedbackColorClass}">${feedbackText}</p>
+                    </div>`;
+                break;
+             case 'ai-intro':
+                const aiAvailable = state.aiStatus.supported;
+                const aiStatusText = aiAvailable ? 'Your device supports on-device AI!' : 'On-device AI not detected.';
+                const aiStatusColor = aiAvailable ? 'text-teal-300' : 'text-yellow-300';
+                const demoModeText = !aiAvailable ? '<p class="text-white/80 mt-2">No worries! We\'ll use a fun demo mode so you don\'t miss out.</p>' : '';
+                
+                content = `
+                    ${backButton('/onboarding/mantras')}
+                    <div class="text-center animate-fade-in max-w-md mx-auto">
+                        ${ICONS.Cpu({ size: 64, className: "mb-4 text-teal" })}
+                        <h1 class="text-4xl font-serif mb-4">Powered by AI</h1>
+                        <p class="text-lg text-white/80 mb-6">MantraOS uses private, on-device AI to help you create, translate, and refine your mantras—even offline.</p>
+                        <div class="glass-card p-4 rounded-xl text-left text-sm mb-6 space-y-2">
+                           <div class="flex items-center">${ICONS.Check({size: 16, className: "text-teal mr-2"})} Speak an idea, get a mantra.</div>
+                           <div class="flex items-center">${ICONS.Check({size: 16, className: "text-teal mr-2"})} Translate mantras instantly.</div>
+                           <div class="flex items-center">${ICONS.Check({size: 16, className: "text-teal mr-2"})} Rephrase for more impact.</div>
+                        </div>
+                        <p class="font-semibold ${aiStatusColor}">${aiStatusText}</p>
+                        ${demoModeText}
+                        ${renderButton('Try AI Now', { attributes: 'data-action="nav" data-path="/onboarding/ai-voice-demo"'})}
+                    </div>`;
+                break;
+            case 'ai-voice-demo':
+                content = `
+                    ${backButton('/onboarding/ai-intro')}
+                    <div id="onboarding-ai-view" class="text-center animate-fade-in max-w-md mx-auto">
+                        ${ICONS.Wand2({ size: 48, className: "mx-auto mb-4 text-gold" })}
+                        <h2 class="text-3xl font-serif mb-2">Let's Create with AI</h2>
+                        <p class="text-white/80 mb-6">Tap the microphone and say a topic like "creativity" or "finding peace".</p>
+                        
+                        <div id="onboarding-mic-container" class="mb-6 flex flex-col items-center justify-center h-24">
+                            <!-- Mic UI will be rendered by JS -->
+                        </div>
+
+                        <div id="onboarding-ai-result" class="space-y-4">
+                            <!-- AI result will be shown here -->
+                        </div>
+                        
+                        <div class="mt-8">
+                             ${renderButton('Continue to Next Step', { variant: 'secondary', attributes: 'data-action="nav" data-path="/onboarding/custom"'})}
+                        </div>
                     </div>`;
                 break;
             case 'custom':
                  content = `
-                    ${backButton('/onboarding/mantras')}
+                    ${backButton('/onboarding/ai-voice-demo')}
                     <div class="text-center max-w-md mx-auto animate-fade-in">
                         ${ICONS.Edit({ size: 48, className: "mx-auto mb-4 text-gold" })}
                         <h2 class="text-3xl font-serif mb-4">Add Your Own Voice</h2>
@@ -1400,6 +1516,7 @@
         }
         root.innerHTML = `<div class="min-h-screen w-full flex flex-col items-center justify-center p-4 theme-gradient-1 text-white relative">${content}</div>`;
         if (step === 'mantras') renderMantraSelectionList(CATEGORIES.filter(c => c !== 'AI Generated')[0]);
+        if (step === 'ai-voice-demo') renderOnboardingAiDemoState('idle');
     }
 
     function renderMantraSelectionList(category) {
@@ -1755,18 +1872,21 @@
     const renderMyMantraItem = (mantra) => {
       const colors = getTextColorClasses();
       const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
+      const canUseAi = isAnyAiFeatureEnabled();
 
       return `
           <div class="glass-card p-4 space-y-3" id="mantra-item-${mantra.id}">
               <div class="flex justify-between items-start">
                   <p class="flex-grow text-lg">"${getMantraText(mantra)}"</p>
                   <div class="flex gap-2 ml-2 flex-shrink-0">
-                      <button data-action="translate-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Translate mantra" title="Translate mantra with AI">
-                          ${ICONS.Globe({size: 18})}
-                      </button>
-                      <button data-action="proofread-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Proofread mantra" title="Proofread mantra with AI">
-                          ${ICONS.Languages({size: 18})}
-                      </button>
+                      ${canUseAi ? `
+                          <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Rephrase with AI" title="Rephrase with AI">
+                              ${ICONS.Wand2({size: 18})}
+                          </button>
+                          <button data-action="translate-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Translate mantra" title="Translate mantra with AI">
+                              ${ICONS.Globe({size: 18})}
+                          </button>
+                      ` : ''}
                       <button data-action="edit-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Edit mantra" title="Edit mantra">
                           ${ICONS.Edit({size: 18})}
                       </button>
@@ -1947,6 +2067,40 @@
                          ${toggle('slideshow.enabled', 'Enable Slideshow')}
                      </div>
                 </div>
+
+                ${isAnyAiFeatureEnabled() ? `
+                <div class="glass-card p-4 rounded-2xl">
+                    <h2 class="text-xl font-serif mb-3 flex items-center">
+                        AI Customization ${ICONS.Wand2({size: 20, className: 'inline ml-2'})}
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="mb-2 ${colors.secondary}">Creativity</p>
+                            <div class="flex gap-2">
+                                ${['focused', 'balanced', 'creative'].map(val => `
+                                    <button data-setting="aiSettings.creativity" data-value="${val}" class="flex-1 p-2 rounded-lg capitalize text-sm transition-colors ${settings.aiSettings.creativity === val ? `bg-white ${colors.needsDarkText ? 'text-charcoal' : 'text-deep-purple'}` : colors.bgMuted20}">${val}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <p class="mb-2 ${colors.secondary}">Tone</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${['inspirational', 'assertive', 'gentle', 'calm'].map(val => `
+                                    <button data-setting="aiSettings.tone" data-value="${val}" class="p-2 rounded-lg capitalize text-sm transition-colors ${settings.aiSettings.tone === val ? `bg-white ${colors.needsDarkText ? 'text-charcoal' : 'text-deep-purple'}` : colors.bgMuted20}">${val}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <p class="mb-2 ${colors.secondary}">Length</p>
+                            <div class="flex gap-2">
+                                ${['short', 'medium', 'long'].map(val => `
+                                    <button data-setting="aiSettings.length" data-value="${val}" class="flex-1 p-2 rounded-lg capitalize text-sm transition-colors ${settings.aiSettings.length === val ? `bg-white ${colors.needsDarkText ? 'text-charcoal' : 'text-deep-purple'}` : colors.bgMuted20}">${val}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
                 
                 <div class="glass-card p-4 rounded-2xl">
                      <h2 class="text-xl font-serif mb-3 flex items-center">
@@ -2051,6 +2205,34 @@
         `;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     };
+    
+    const renderRewriteModal = (mantra) => {
+        const colors = getTextColorClasses();
+        const modalId = 'rewrite-mantra-modal';
+        document.getElementById(modalId)?.remove();
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-serif">Rephrase Mantra</h2>
+                        <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Close">&times;</button>
+                    </div>
+                    <p class="${colors.secondary} mb-2">Original:</p>
+                    <p class="italic p-3 ${colors.bgMuted} rounded-lg mb-4">"${mantra.text.original}"</p>
+                    
+                    <div class="text-center mb-4">
+                        ${renderButton(`${ICONS.Sparkles({className: 'inline-block mr-2', size: 20})} Generate Alternatives`, { attributes: `data-action="perform-rewrite" data-mantra-id="${mantra.id}"` })}
+                    </div>
+                    
+                    <div id="rewrite-results-container" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        <!-- Results will be injected here -->
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
 
     const renderAiGenerateModal = () => {
         const colors = getTextColorClasses();
@@ -2120,7 +2302,21 @@
             try {
                 if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
                 const { creativity, tone, length } = state.settings.aiSettings;
-                const prompt = `You are an expert in crafting positive affirmations. Generate 5 unique, powerful, first-person mantras about "${topic}". The tone should be ${tone} and the length should be ${length}. Creativity level: ${creativity}. Return only a JSON array of strings, like ["I am...", "I will..."]. Do not include any other text or markdown.`;
+                const prompt = `
+You are a highly skilled life coach specializing in positive psychology and affirmation crafting. Your task is to generate 5 unique, empowering, and motivational mantras based on the topic of "${topic}".
+
+Follow these strict guidelines:
+1.  **Perspective:** All mantras MUST be in the first-person (e.g., "I am...", "I attract...", "My life is...").
+2.  **Tone:** The tone must be strictly positive and ${tone}. Avoid any negative phrasing, double negatives, or words that imply lack or struggle (e.g., instead of "I will not fear", use "I am courageous").
+3.  **Action-Oriented:** Mantras should be actionable or affirming a state of being, not just a wish.
+4.  **Clarity & Brevity:** The length should be ${length}. Keep them concise and easy to remember.
+5.  **Creativity:** Adhere to a ${creativity} level of creativity.
+6.  **Uniqueness:** Each of the 5 mantras should be distinct from the others.
+7.  **Output Format:** Your response MUST be a valid JSON array of strings and nothing else. Do not include any introductory text, explanations, or markdown formatting.
+
+Example for topic "wealth":
+["I am a magnet for financial abundance.", "My income grows consistently and effortlessly.", "I am worthy of the wealth I desire.", "Prosperity flows to me from expected and unexpected sources.", "My relationship with money is healthy and positive."]
+`;
                 const result = await aiTextSession.prompt(prompt);
                 mantras = JSON.parse(result.match(/\[.*\]/s)[0]); // Loosely parse JSON from a potentially messy string
             } catch (e) {
@@ -2135,12 +2331,11 @@
         
         resultsContainer.innerHTML = mantras.map(mantra => {
             const isAdded = state.userMantras.some(m => m.text.original.toLowerCase() === mantra.toLowerCase());
-            const disabled = isAdded ? 'disabled' : '';
-            const icon = isAdded ? ICONS.Check({size: 16}) : ICONS.Plus({size: 16});
+            const uniqueId = `add-gen-btn-${btoa(mantra)}`;
             return `<div class="glass-card p-3 flex justify-between items-center">
                         <span>"${mantra}"</span>
-                        <button data-action="add-generated-mantra" data-text="${encodeURIComponent(mantra)}" class="p-2 bg-teal text-white rounded-full ${isAdded ? 'opacity-50' : ''}" ${disabled}>
-                            ${icon}
+                        <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="mantra" data-text="${encodeURIComponent(mantra)}" class="p-2 bg-teal text-white rounded-full ${isAdded ? 'opacity-50' : ''}" ${isAdded ? 'disabled' : ''}>
+                            ${isAdded ? ICONS.Check({size: 16}) : ICONS.Plus({size: 16})}
                         </button>
                     </div>`;
         }).join('');
@@ -2161,7 +2356,20 @@
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
             try {
                 if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
-                const prompt = `Generate 5 short, positive, first-person affirmations about "${topic}". Return only a JSON array of strings, like ["I am...", "I will..."].`;
+                const { tone } = state.settings.aiSettings;
+                const prompt = `
+You are an expert in crafting uplifting daily affirmations. Your goal is to generate 5 short, positive, and inspiring affirmations related to the theme of "${topic}". These are meant to be read once a day to set a positive tone.
+
+Please adhere to these rules:
+1.  **First-Person:** Affirmations must be in the first-person (e.g., "I am...", "Today, I choose...").
+2.  **Positive Framing:** Use only positive language with a ${tone} tone. Frame statements as present truths or positive intentions for the day. Avoid words like "don't", "can't", or "won't".
+3.  **Brevity:** Keep them concise, ideally under 15 words each.
+4.  **Theme:** They should clearly relate to "${topic}".
+5.  **Output Format:** You MUST return a valid JSON array of 5 strings. Do not include any surrounding text, titles, or markdown.
+
+Example for topic "gratitude":
+["I am thankful for the simple joys of today.", "My heart is open to all the good surrounding me.", "I appreciate the lessons in every experience.", "I find reasons to be grateful in every moment.", "Today, I choose to focus on what I have."]
+`;
                 const result = await aiTextSession.prompt(prompt);
                 affirmations = JSON.parse(result);
             } catch (e) {
@@ -2175,7 +2383,13 @@
         }
         
         resultsContainer.innerHTML = affirmations.map(aff => {
-            return `<div class="glass-card p-3 flex justify-between items-center"><span>"${aff}"</span><button data-action="add-generated-affirmation" data-text="${encodeURIComponent(aff)}" class="p-2 bg-teal text-white rounded-full">${ICONS.Plus({size: 16})}</button></div>`;
+            const uniqueId = `add-gen-btn-${btoa(aff)}`;
+            return `<div class="glass-card p-3 flex justify-between items-center">
+                        <span>"${aff}"</span>
+                        <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="affirmation" data-text="${encodeURIComponent(aff)}" class="p-2 bg-teal text-white rounded-full">
+                            ${ICONS.Plus({size: 16})}
+                        </button>
+                    </div>`;
         }).join('');
     };
 
@@ -2247,6 +2461,52 @@
         }
     };
     
+    const handlePerformRewrite = async (mantraId) => {
+        const mantra = state.userMantras.find(m => m.id === mantraId);
+        if (!mantra) return;
+
+        const resultsContainer = document.getElementById('rewrite-results-container');
+        resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+        
+        let alternatives = [];
+        if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
+            try {
+                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                const { creativity, tone, length } = state.settings.aiSettings;
+                const prompt = `
+You are an expert editor specializing in motivational content. Your task is to rephrase the following mantra to offer alternative perspectives while preserving its core positive meaning: "${mantra.text.original}"
+
+Follow these guidelines:
+1.  **Preserve Core Meaning:** The new versions must be about the same concept as the original.
+2.  **Tone & Style:** Maintain a ${tone} tone and aim for a ${length} length. Use a ${creativity} level of creativity.
+3.  **First-Person:** Keep the mantras in the first-person.
+4.  **Variety:** Provide 3 distinct alternatives.
+5.  **Output Format:** Your response MUST be a valid JSON array of strings. Do not include explanations, titles, or markdown.
+
+Original Mantra: "${mantra.text.original}"
+`;
+                const result = await aiTextSession.prompt(prompt);
+                alternatives = JSON.parse(result.match(/\[.*\]/s)[0]);
+            } catch (e) {
+                console.error('AI Rewrite Error:', e);
+                alternatives = [`[Demo] A new way to say "${mantra.text.original}".`];
+                renderToast('AI failed. Showing demo result.');
+            }
+        } else {
+            await new Promise(r => setTimeout(r, 1500));
+            alternatives = [`[Demo] An alternative for "${mantra.text.original}".`, `[Demo] Another version could be this.`];
+        }
+        
+        resultsContainer.innerHTML = alternatives.map(alt => {
+            return `<div class="glass-card p-3 flex justify-between items-center">
+                        <span>"${alt}"</span>
+                        <button data-action="open-rewrite-confirmation" data-mantra-id="${mantra.id}" data-text="${encodeURIComponent(alt)}" class="p-2 bg-teal text-white rounded-full">
+                            Use this
+                        </button>
+                    </div>`;
+        }).join('');
+    };
+
     const stopAiTopicRecording = () => {
         if (aiTopicRecorder && aiTopicRecorder.state === 'recording') {
             aiTopicRecorder.stop();
@@ -2339,6 +2599,118 @@
                 renderModal('Microphone Permission Required', 'Please allow microphone access to use this feature.');
             } else {
                 renderModal('Microphone Error', 'Could not access the microphone.');
+            }
+        }
+    };
+
+    const stopOnboardingAiRecording = () => {
+        if (onboardingAiRecorder && onboardingAiRecorder.state === 'recording') {
+            onboardingAiRecorder.stop();
+        }
+        clearTimeout(onboardingAiTimer);
+        clearInterval(onboardingAiInterval);
+        onboardingAiTimer = null;
+        onboardingAiInterval = null;
+    };
+
+    const startOnboardingAiRecording = async () => {
+        if (!isAnyAiFeatureEnabled()) {
+            renderOnboardingAiDemoState('processing', { message: 'Entering Demo Mode...' });
+            await new Promise(r => setTimeout(r, 750));
+            
+            renderOnboardingAiDemoState('processing', { message: 'Processing Audio... (Demo)' });
+            await new Promise(r => setTimeout(r, 750));
+            
+            renderOnboardingAiDemoState('processing', { message: 'Transcribing... (Demo)' });
+            await new Promise(r => setTimeout(r, 1000));
+
+            renderOnboardingAiDemoState('processing', { message: 'Generating mantra... (Demo)' });
+            await new Promise(r => setTimeout(r, 1500));
+            
+            const demoMantra = '[Demo] I am filled with creative energy and bright ideas.';
+            unlockAchievement('audio_mantra');
+            renderOnboardingAiDemoState('result', { mantra: demoMantra, topic: 'creativity' });
+            return;
+        }
+        
+        if (onboardingAiRecorder && onboardingAiRecorder.state === 'recording') stopOnboardingAiRecording();
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            renderOnboardingAiDemoState('recording');
+            onboardingAiChunks = [];
+            
+            onboardingAiRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+            onboardingAiRecorder.ondataavailable = event => {
+                onboardingAiChunks.push(event.data);
+            };
+            
+            onboardingAiRecorder.onstop = async () => {
+                const audioBlob = new Blob(onboardingAiChunks, { type: 'audio/webm' });
+                stream.getTracks().forEach(track => track.stop());
+
+                renderOnboardingAiDemoState('processing', { message: 'Processing Audio...' });
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                renderOnboardingAiDemoState('processing', { message: 'Transcribing...' });
+
+                let topic = '';
+                try {
+                    const audioBuffer = await audioBlob.arrayBuffer();
+                    topic = await window.ai.assistant.prompt({ audio: audioBuffer });
+                } catch (e) {
+                    console.error("Onboarding AI Transcription error:", e);
+                    renderOnboardingAiDemoState('error', { message: 'Could not transcribe audio.' });
+                    return;
+                }
+
+                if (!topic) {
+                     renderOnboardingAiDemoState('error', { message: 'Could not understand topic.' });
+                     return;
+                }
+
+                renderOnboardingAiDemoState('processing', { message: 'Generating mantra...' });
+
+                let mantra = '';
+                try {
+                    if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                    const prompt = `Generate one short, powerful, first-person mantra about "${topic}". Return only the mantra text as a single string. Do not include quotes or any other text.`;
+                    const rawMantra = await aiTextSession.prompt(prompt);
+                    mantra = rawMantra.replace(/^["']|["']$/g, '');
+                } catch (e) {
+                    console.error('Onboarding AI Mantra Generation Error:', e);
+                    renderOnboardingAiDemoState('error', { message: 'Could not generate mantra.' });
+                    return;
+                }
+                
+                unlockAchievement('audio_mantra');
+                renderOnboardingAiDemoState('result', { mantra, topic });
+            };
+
+            onboardingAiRecorder.start();
+            
+            // Auto-stop
+            onboardingAiTimer = setTimeout(stopOnboardingAiRecording, MAX_AI_RECORDING_SECONDS * 1000);
+            
+            // UI Timer update
+            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
+            const timerEl = document.getElementById('onboarding-ai-timer');
+            if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
+
+            onboardingAiInterval = setInterval(() => {
+                secondsRemaining--;
+                const timerEl = document.getElementById('onboarding-ai-timer');
+                if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
+                if (secondsRemaining <= 0) clearInterval(onboardingAiInterval);
+            }, 1000);
+
+        } catch (err) {
+            console.error("Error accessing microphone for Onboarding AI:", err);
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                renderOnboardingAiDemoState('error', { message: 'Microphone permission denied.' });
+            } else {
+                renderOnboardingAiDemoState('error', { message: 'Microphone not found.' });
             }
         }
     };
@@ -2482,6 +2854,40 @@
                     }
                     break;
                 }
+                case 'start-onboarding-ai-recording': startOnboardingAiRecording(); break;
+                case 'stop-onboarding-ai-recording': stopOnboardingAiRecording(); break;
+                case 'open-onboarding-confirmation': {
+                    const text = decodeURIComponent(target.dataset.text);
+                    renderOnboardingAiConfirmationModal(text);
+                    break;
+                }
+                case 'confirm-onboarding-add': {
+                    const text = document.getElementById('onboarding-ai-confirm-text').value.trim();
+                    if (!text) {
+                        renderToast("Mantra can't be empty.");
+                        return;
+                    }
+                    const originalText = decodeURIComponent(target.dataset.originalText);
+                    const newMantra = {
+                        id: `ai_${Date.now()}`,
+                        text: { original: text, translated: null },
+                        category: 'AI Generated',
+                        priority: 'Medium',
+                        createdAt: Date.now(),
+                        isCustom: true,
+                    };
+                    state.onboardingTempMantras.push(newMantra);
+                    saveState();
+                    renderToast('AI mantra added!');
+                    document.getElementById('onboarding-ai-confirmation-modal')?.remove();
+                    
+                    const originalButton = document.querySelector(`[data-action="open-onboarding-confirmation"][data-text="${encodeURIComponent(originalText)}"]`);
+                    if (originalButton) {
+                        originalButton.innerHTML = `${ICONS.Check({size: 20, className: 'inline mr-2'})} Added!`;
+                        originalButton.disabled = true;
+                    }
+                    break;
+                }
                 
                 // Library & Affirmations
                 case 'library-tab': renderLibraryContent(target.dataset.tab); break;
@@ -2570,30 +2976,45 @@
                 case 'start-ai-topic-recording': startAiTopicRecording(); break;
                 case 'stop-ai-topic-recording': stopAiTopicRecording(); break;
                 case 'generate-ai-mantras': handleGenerateAiMantras(); break;
-                case 'add-generated-mantra': {
-                    const text = decodeURIComponent(target.dataset.text);
-                    const newMantra = {
-                        id: `ai_${Date.now()}`,
-                        text: { original: text, translated: null },
-                        category: 'AI Generated',
-                        priority: 'Medium',
-                        createdAt: Date.now(),
-                        isCustom: true,
-                    };
-                    performAction({ type: 'ADD_MANTRA', payload: newMantra });
-                    renderToast('Mantra added!');
-                    target.innerHTML = ICONS.Check({size: 16});
-                    target.disabled = true;
-                    break;
-                }
                 case 'open-ai-affirmation-modal': renderAiAffirmationModal(); break;
                 case 'generate-ai-affirmations': handleGenerateAiAffirmations(); break;
-                case 'add-generated-affirmation': {
+                case 'open-ai-confirmation': {
                     const text = decodeURIComponent(target.dataset.text);
-                    performAction({ type: 'ADD_AFFIRMATION', payload: { id: `aff_${Date.now()}`, text } });
-                    renderToast('Affirmation added!');
-                    target.innerHTML = ICONS.Check({size: 16});
-                    target.disabled = true;
+                    const type = target.dataset.type;
+                    renderAiConfirmationModal(text, type, target.id);
+                    break;
+                }
+                case 'confirm-add-ai-item': {
+                    const text = document.getElementById('ai-confirm-text').value.trim();
+                    if (!text) {
+                        renderToast("Text cannot be empty.");
+                        return;
+                    }
+                    const type = target.dataset.type;
+                    const buttonId = target.dataset.buttonId;
+
+                    if (type === 'mantra') {
+                        const newMantra = {
+                            id: `ai_${Date.now()}`,
+                            text: { original: text, translated: null },
+                            category: document.getElementById('ai-confirm-category').value,
+                            priority: document.getElementById('ai-confirm-priority').value,
+                            createdAt: Date.now(),
+                            isCustom: true,
+                        };
+                        performAction({ type: 'ADD_MANTRA', payload: newMantra });
+                    } else { // affirmation
+                        performAction({ type: 'ADD_AFFIRMATION', payload: { id: `aff_${Date.now()}`, text } });
+                    }
+                    
+                    renderToast(`${type.charAt(0).toUpperCase() + type.slice(1)} added!`);
+                    document.getElementById('ai-confirmation-modal')?.remove();
+
+                    const originalButton = document.getElementById(buttonId);
+                    if (originalButton) {
+                        originalButton.innerHTML = ICONS.Check({size: 16});
+                        originalButton.disabled = true;
+                    }
                     break;
                 }
                 case 'translate-mantra': {
@@ -2603,7 +3024,39 @@
                 }
                 case 'perform-translation': handlePerformTranslation(mantraId); break;
                 case 'save-translation': handleSaveTranslation(mantraId); break;
-                
+                case 'rewrite-mantra': {
+                    const mantraToRewrite = state.userMantras.find(m => m.id === mantraId);
+                    if (mantraToRewrite) renderRewriteModal(mantraToRewrite);
+                    break;
+                }
+                case 'perform-rewrite': handlePerformRewrite(mantraId); break;
+                case 'open-rewrite-confirmation': {
+                     const newText = decodeURIComponent(target.dataset.text);
+                     renderRewriteConfirmationModal(mantraId, newText);
+                     break;
+                }
+                case 'confirm-rewrite': {
+                    const newText = document.getElementById('rewrite-confirm-text').value.trim();
+                    if (!newText) {
+                        renderToast("Mantra can't be empty.");
+                        return;
+                    }
+                    performAction({
+                        type: 'UPDATE_MANTRA',
+                        payload: { id: mantraId, text: { original: newText, translated: null } }
+                    });
+                    document.getElementById('rewrite-mantra-modal')?.remove();
+                    document.getElementById('rewrite-confirmation-modal')?.remove();
+                    renderToast('Mantra updated!');
+                    const currentPath = window.location.hash.slice(1);
+                    if (currentPath.startsWith('/library')) {
+                        renderLibraryContent('my-mantras');
+                    } else if (currentPath.startsWith('/dashboard') || currentPath === '') {
+                        renderDashboard();
+                    }
+                    break;
+                }
+
                 // Undo/Redo
                 case 'undo': undo(); break;
                 case 'redo': redo(); break;
@@ -2698,7 +3151,7 @@
                         <h2 class="text-2xl font-serif">${isEditing ? 'Edit Mantra' : 'Create New Mantra'}</h2>
                         <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full">&times;</button>
                     </div>
-                    <form class="space-y-4">
+                    <form onsubmit="return false;" class="space-y-4">
                         <textarea id="mantra-form-text" class="w-full h-28 p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}" placeholder="e.g., I am a creative powerhouse.">${mantra?.text?.original || ''}</textarea>
                         <select id="mantra-form-category" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
                             ${CATEGORIES.map(cat => `<option value="${cat}" ${mantra?.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
@@ -2708,6 +3161,85 @@
                         </select>
                         <div class="text-right">
                            ${renderButton(isEditing ? 'Save Changes' : 'Create Mantra', { attributes: `data-action="submit-mantra-form" ${isEditing ? `data-mantra-id="${mantra.id}"` : ''}`})}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+
+    const renderAiConfirmationModal = (text, type, originalButtonId) => {
+        const modalId = 'ai-confirmation-modal';
+        document.getElementById(modalId)?.remove();
+        const colors = getTextColorClasses();
+        const isMantra = type === 'mantra';
+        const title = isMantra ? 'Review & Add Mantra' : 'Review & Add Affirmation';
+
+        const mantraFields = isMantra ? `
+            <select id="ai-confirm-category" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
+                ${CATEGORIES.map(cat => `<option value="${cat}" ${cat === 'AI Generated' ? 'selected' : ''}>${cat}</option>`).join('')}
+            </select>
+            <select id="ai-confirm-priority" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
+                ${PRIORITY_LEVELS.map(p => `<option value="${p}" ${p === 'Medium' ? 'selected' : ''}>${p} Priority</option>`).join('')}
+            </select>
+        ` : '';
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-serif">${title}</h2>
+                        <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full">&times;</button>
+                    </div>
+                    <form onsubmit="return false;" class="space-y-4">
+                        <textarea id="ai-confirm-text" class="w-full h-28 p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">${text}</textarea>
+                        ${mantraFields}
+                        <div class="flex justify-end gap-3">
+                           ${renderButton('Cancel', { variant: 'secondary', attributes: `data-action="close-modal-by-id" data-modal-id="${modalId}"`})}
+                           ${renderButton(isMantra ? 'Save Mantra' : 'Save Affirmation', { attributes: `data-action="confirm-add-ai-item" data-type="${type}" data-button-id="${originalButtonId}"`})}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+    
+    const renderRewriteConfirmationModal = (mantraId, newText) => {
+        const modalId = 'rewrite-confirmation-modal';
+        document.getElementById(modalId)?.remove();
+        const colors = getTextColorClasses();
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <h2 class="text-2xl font-serif mb-4">Confirm & Update Mantra</h2>
+                    <form onsubmit="return false;" class="space-y-4">
+                        <textarea id="rewrite-confirm-text" class="w-full h-28 p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">${newText}</textarea>
+                        <div class="flex justify-end gap-3">
+                           ${renderButton('Cancel', { variant: 'secondary', attributes: `data-action="close-modal-by-id" data-modal-id="${modalId}"`})}
+                           ${renderButton('Update Mantra', { attributes: `data-action="confirm-rewrite" data-mantra-id="${mantraId}"`})}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+
+    const renderOnboardingAiConfirmationModal = (text) => {
+        const modalId = 'onboarding-ai-confirmation-modal';
+        document.getElementById(modalId)?.remove();
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card text-white w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <h2 class="text-2xl font-serif mb-4">Review & Add Mantra</h2>
+                    <form onsubmit="return false;" class="space-y-4">
+                        <textarea id="onboarding-ai-confirm-text" class="w-full h-28 p-3 bg-white/10 rounded-lg placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white">${text}</textarea>
+                        <div class="flex justify-end gap-3">
+                           ${renderButton('Cancel', { variant: 'secondary', attributes: `data-action="close-modal-by-id" data-modal-id="${modalId}"`})}
+                           ${renderButton('Add Mantra', { attributes: `data-action="confirm-onboarding-add" data-original-text="${encodeURIComponent(text)}"`})}
                         </div>
                     </form>
                 </div>
