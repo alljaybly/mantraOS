@@ -2596,7 +2596,7 @@ Original Mantra: "${mantra.text.original}"
             isRecordingAiTopic = false;
             renderAiGenerateModal(); // Re-render to show idle state
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderModal('Microphone Permission Required', 'Please allow microphone access to use this feature.');
+                renderModal('Microphone Permission Required', 'Please allow microphone access in your browser settings to record voice mantras.');
             } else {
                 renderModal('Microphone Error', 'Could not access the microphone.');
             }
@@ -2708,7 +2708,7 @@ Original Mantra: "${mantra.text.original}"
         } catch (err) {
             console.error("Error accessing microphone for Onboarding AI:", err);
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderOnboardingAiDemoState('error', { message: 'Microphone permission denied.' });
+                renderOnboardingAiDemoState('error', { message: 'Microphone Permission Required. Please allow access in your browser settings.' });
             } else {
                 renderOnboardingAiDemoState('error', { message: 'Microphone not found.' });
             }
@@ -2789,6 +2789,18 @@ Original Mantra: "${mantra.text.original}"
 
     const setupEventListeners = () => {
         document.body.addEventListener('click', e => {
+            const settingButtonTarget = e.target.closest('button[data-setting]');
+            if (settingButtonTarget) {
+                hapticFeedback();
+                const path = settingButtonTarget.dataset.setting;
+                const value = settingButtonTarget.dataset.value;
+                setNestedValue(state.settings, path, value);
+                saveState();
+                applySettings();
+                handleHashChange();
+                return;
+            }
+            
             const target = e.target.closest('[data-action]');
             if (!target) return;
             
@@ -3070,8 +3082,6 @@ Original Mantra: "${mantra.text.original}"
                 let value;
                 if (settingTarget.type === 'checkbox') {
                     value = settingTarget.checked;
-                } else if (settingTarget.tagName === 'BUTTON') {
-                    value = settingTarget.dataset.value;
                 } else {
                     value = settingTarget.type === 'range' ? parseInt(settingTarget.value, 10) : settingTarget.value;
                 }
