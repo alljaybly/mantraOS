@@ -678,36 +678,48 @@
     
     // --- SLIDESHOW LOGIC ---
     const stopSlideshow = () => {
-        clearTimeout(slideshowTimer);
-        slideshowTimer = null;
+        if (slideshowTimer) {
+            clearTimeout(slideshowTimer);
+            slideshowTimer = null;
+        }
     };
 
     const goToNextMantra = () => {
-        // Guard to prevent slideshow from navigating user back to dashboard
-        const currentPath = window.location.hash.slice(1) || '/';
-        if (currentPath !== '/dashboard' && currentPath !== '/') {
+        // DOUBLE CHECK we're still on dashboard before proceeding
+        const currentPath = window.location.hash.slice(1);
+        if (currentPath !== '/dashboard' && currentPath !== '') {
             stopSlideshow();
-            return;
+            return; // ABORT if not on dashboard
         }
-
+        
+        // Only then proceed with mantra rotation
         const newIndex = (state.currentMantraIndex + 1) % state.userMantras.length;
         state.currentMantraIndex = newIndex;
         renderTransitionParticles();
 
-        // Re-introducing a setTimeout to allow for a fade-out animation and to resolve
-        // potential browser rendering issues, mirroring the working logic in handleSwipe.
         const mantraText = document.getElementById('mantra-text');
         if (mantraText) {
             mantraText.style.opacity = '0';
-            setTimeout(renderDashboard, 150);
+            setTimeout(() => {
+                renderDashboard();
+            }, 150);
         } else {
             renderDashboard();
         }
+        
+        // Restart slideshow ONLY if still on dashboard
+        startSlideshow();
     };
 
     const startSlideshow = () => {
-        stopSlideshow(); // Ensure no multiple timers are running
+        // ONLY start if user is actually on dashboard AND has multiple mantras
+        const currentPath = window.location.hash.slice(1);
+        if (currentPath !== '/dashboard' && currentPath !== '') {
+            return; // IMMEDIATELY EXIT if not on dashboard
+        }
+        
         if (state.settings.slideshow.enabled && state.userMantras.length > 1) {
+            stopSlideshow(); // Clear any existing timer
             slideshowTimer = setTimeout(goToNextMantra, state.settings.slideshow.interval * 1000);
         }
     };
@@ -1309,7 +1321,7 @@
         }
         root.innerHTML = `<div class="min-h-screen w-full flex flex-col items-center justify-center p-4 theme-gradient-1 text-white relative">${content}</div>`;
         if (step === 'mantras') renderMantraSelectionList(CATEGORIES.filter(c => c !== 'AI Generated')[0]);
-    };
+    }
 
     function renderMantraSelectionList(category) {
         const container = document.getElementById('mantra-list');
@@ -2052,37 +2064,36 @@
     
     // --- APP ROUTING & INITIALIZATION ---
     const handleHashChange = () => {
-      const path = window.location.hash.slice(1) || '/';
-      stopSlideshow();
-      stopPlayback();
-      
-      if (path.startsWith('/onboarding')) {
-        const step = path.split('/')[2] || 'welcome';
-        renderOnboarding(step);
-      } else if (!state.isOnboardingComplete) {
-        window.location.hash = '/onboarding/welcome';
-      } else {
-        switch(path) {
-          case '/dashboard':
-          case '/':
-            renderDashboard();
-            break;
-          case '/affirmations':
-            renderAffirmations();
-            break;
-          case '/library':
-            renderLibrary();
-            break;
-          case '/progress':
-            renderProgress();
-            break;
-          case '/settings':
-            renderSettings();
-            break;
-          default:
-            window.location.hash = '/dashboard';
+        const path = window.location.hash.slice(1) || '/';
+        
+        // STOP SLIDESHOW & AUDIO ON EVERY PAGE CHANGE
+        stopSlideshow();
+        stopPlayback();
+        
+        if (!state.isOnboardingComplete && !path.startsWith('/onboarding')) {
+            window.location.hash = '/onboarding/welcome';
+            return;
         }
-      }
+
+        if (path.startsWith('/onboarding')) {
+            renderOnboarding(path.split('/')[2] || 'welcome');
+        } else {
+            applySettings();
+            switch (path) {
+                case '/library': renderLibrary(); break;
+                case '/progress': renderProgress(); break;
+                case '/settings': renderSettings(); break;
+                case '/affirmations': renderAffirmations(); break;
+                case '/dashboard': 
+                case '/':
+                    renderDashboard(); 
+                    // ONLY start after dashboard is fully rendered
+                    setTimeout(startSlideshow, 100);
+                    break;
+                default:
+                    window.location.hash = '/dashboard';
+            }
+        }
     };
 
     const setupSwipeListeners = () => {
