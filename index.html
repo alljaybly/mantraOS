@@ -225,6 +225,7 @@
         RotateCw: createIcon('RotateCw', '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'),
         Sparkles: createIcon('Sparkles', '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>'),
         Languages: createIcon('Languages', '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>'),
+        Globe: createIcon('Globe', '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-2z"></path>'),
         Wand2: createIcon('Wand2', '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M11.8 17.8 13 19"/><path d="M19 11.8 17.8 13"/><path d="M13 11.8 11.8 13"/><path d="m21.1 12.3-1.1 1.1a4.9 4.9 0 0 1-7 7l-1.8-1.8a4.9 4.9 0 0 1 7-7l1.1-1.1Z"/><path d="M3 21a2.4 2.4 0 0 1 0-3.4l3.1-3.1"/>'),
         Cpu: createIcon('Cpu', '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>'),
     };
@@ -422,6 +423,7 @@
         audioRecordings: 'mantraos_audio_recordings',
         lastDailyGoal: 'mantraos_last_daily_goal',
         lastStreakMilestone: 'mantraos_last_streak_milestone',
+        curatedTranslations: 'mantraos_curated_translations',
     };
 
     function saveState() {
@@ -500,6 +502,15 @@
             };
             
             state.settings = deepMerge(defaultSettings, loadedSettings);
+
+            // Apply saved translations to curated mantras
+            const savedCuratedTranslations = JSON.parse(localStorage.getItem(storageKeys.curatedTranslations)) || {};
+            if (savedCuratedTranslations.lang === state.settings.language && savedCuratedTranslations.translations) {
+                Object.entries(savedCuratedTranslations.translations).forEach(([id, text]) => {
+                    const mantra = CURATED_MANTRAS.find(m => m.id === id);
+                    if (mantra) mantra.text.translated = text;
+                });
+            }
 
             state.progress = JSON.parse(localStorage.getItem(storageKeys.progress)) || {};
             state.isOnboardingComplete = JSON.parse(localStorage.getItem(storageKeys.onboarding)) || false;
@@ -816,7 +827,12 @@
         } catch (err) {
             console.error("Error accessing microphone:", err);
             currentlyRecordingMantraId = null;
-            renderModal('Microphone Error', 'Could not access the microphone. Please ensure you have granted permission in your browser settings.');
+            startSlideshow(); // Resume slideshow on error to prevent UI freeze
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                renderModal('Microphone Permission Required', 'Please allow microphone access in your browser settings to record voice mantras.');
+            } else {
+                renderModal('Microphone Error', 'Could not access the microphone. Please ensure your microphone is connected and try again.');
+            }
         }
     };
 
@@ -1474,7 +1490,7 @@
                 </div>
             `;
         }
-        renderPage(content, { showBackButton: true, showUndoRedo: true });
+        renderPage(content, { showBackButton: true, showUndoRedo: false });
     };
 
     const renderLibrary = () => {
@@ -1568,2063 +1584,668 @@
                             return (b.createdAt || 0) - (a.createdAt || 0);
                     }
                 });
-
+                
                 content = `
-                    <div class="flex flex-wrap justify-center gap-2 mb-4">
-                        ${priorityButtons}
-                    </div>
-                    <div class="flex justify-center items-center mb-4">
-                        <label for="mantra-sort-select" class="text-sm ${colors.secondary} mr-2">Sort by:</label>
-                        <select id="mantra-sort-select" data-action="set-mantra-sort" class="${colors.bgMuted} rounded-md py-1 px-2 focus:outline-none focus:ring-2 ${colors.ring}">
+                    <div class="flex justify-between items-center mb-4">
+                         <div class="flex flex-wrap gap-2">
+                            ${priorityButtons}
+                        </div>
+                        <select id="my-mantras-sort" class="${colors.bgMuted} rounded-full py-2 px-3 focus:outline-none focus:ring-2 ${colors.ring}">
                             <option value="date-desc" ${myMantrasSortOrder === 'date-desc' ? 'selected' : ''}>Newest First</option>
                             <option value="date-asc" ${myMantrasSortOrder === 'date-asc' ? 'selected' : ''}>Oldest First</option>
-                            <option value="priority-desc" ${myMantrasSortOrder === 'priority-desc' ? 'selected' : ''}>Priority (High to Low)</option>
-                            <option value="priority-asc" ${myMantrasSortOrder === 'priority-asc' ? 'selected' : ''}>Priority (Low to High)</option>
+                            <option value="priority-desc" ${myMantrasSortOrder === 'priority-desc' ? 'selected' : ''}>Priority (High-Low)</option>
+                            <option value="priority-asc" ${myMantrasSortOrder === 'priority-asc' ? 'selected' : ''}>Priority (Low-High)</option>
                         </select>
                     </div>
-                    <div class="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
-                    ${sortedMantras.length > 0 ? sortedMantras.map(mantra => {
-                        const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
-                        const canRewrite = isAnyAiFeatureEnabled();
-                        const rephraseButton = canRewrite ? `
-                            <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30} flex-shrink-0" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
-                                ${ICONS.Wand2({ size: 16 })}
-                            </button>
-                        ` : '';
-
-                        return `
-                        <div class="glass-card p-4 rounded-lg">
-                            <div class="flex justify-between items-start">
-                                <p class="pr-4 flex-grow">"${getMantraText(mantra)}"</p>
-                                <div class="flex gap-2">
-                                    ${rephraseButton}
-                                    <button data-action="toggle-library-mantra" data-mantra-id='${mantra.id}' class="p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30} flex-shrink-0" aria-label="Remove this mantra" title="Remove mantra">
-                                        ${ICONS.Trash2({ size: 16 })}
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="mt-3 pt-3 border-t ${colors.border}">
-                                <div id="audio-controls-${mantra.id}" class="mb-3">
-                                    ${renderAudioInterface(mantra.id)}
-                                </div>
-                                <div class="flex items-center justify-between">
-                                     <div class="flex items-center gap-2">
-                                        <span class="text-xs ${colors.bgMuted} px-2 py-0.5 rounded-full">${mantra.category}</span>
-                                        <span class="text-xs px-2 py-0.5 rounded-full ${priorityColor} font-semibold text-white">${mantra.priority}</span>
-                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        ${PRIORITY_LEVELS.map(p => `
-                                            <button data-action="set-mantra-priority" data-mantra-id="${mantra.id}" data-priority="${p}" class="px-2 py-0.5 text-xs rounded-full transition-colors ${mantra.priority === p ? 'bg-white text-deep-purple font-bold' : `${colors.bgMuted20} ${colors.bgHover30}`}" aria-label="Set priority to ${p}" title="Set priority to ${p}">${p}</button>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        `}).join('') : `<div class="text-center p-8"><p class="${colors.secondary}">No mantras found with this priority.</p></div>`}
-                    </div>`;
-            }
-            const canProofread = state.settings.aiFeatures.enabled && (state.aiStatus.proofreader || state.settings.demoMode.enabled);
-            const canSuggest = state.settings.aiFeatures.enabled && (state.aiStatus.text || state.settings.demoMode.enabled);
-            content += `
-                <div class="mt-6 border-t ${colors.border} pt-4">
-                    <h3 class="text-lg font-semibold text-center mb-3">Create Your Own Mantra</h3>
-                    <div class="space-y-3">
-                        <textarea id="new-custom-mantra-text" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} resize-none" placeholder="e.g., I am resilient and strong." maxlength="150" rows="3"></textarea>
-                        <div id="new-mantra-char-count" class="text-right text-xs ${colors.tertiary}">0/150</div>
-                        <div id="proofread-suggestion" class="hidden text-sm p-2 bg-teal/20 rounded-lg text-left"></div>
-                        <div id="ai-suggestion-container" class="space-y-2"></div>
-                        <select id="new-custom-mantra-category" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
-                            ${CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
-                        </select>
-                        <select id="new-custom-mantra-priority" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
-                            <option value="Medium">Medium Priority</option>
-                            <option value="High">High Priority</option>
-                            <option value="Low">Low Priority</option>
-                        </select>
-                        <div class="flex gap-2">
-                            ${canProofread ? `<button data-action="proofread-mantra" id="proofread-mantra-btn" class="flex-1 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Check grammar for the text above" title="Check grammar">${ICONS.CheckCircle({size:20})}<span>Grammar</span></button>` : ''}
-                            ${canSuggest ? `<button data-action="suggest-phrasing" id="suggest-phrasing-btn" class="flex-1 p-3 rounded-full ${colors.bgMuted20} ${colors.bgHover30} transition-colors disabled:opacity-50 flex items-center justify-center gap-2" disabled aria-label="Suggest alternative phrasing for the text above" title="Suggest alternative phrasing">${ICONS.Wand2({size:20})}<span>Suggest</span></button>` : ''}
-                            <button data-action="add-new-custom-mantra" id="add-custom-mantra-btn" class="flex-1 p-3 font-semibold rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed ${colors.bgMuted20} ${colors.bgHover30} ${colors.ring} flex items-center justify-center gap-2" disabled aria-label="Add this new mantra to your list" title="Add new mantra">${ICONS.Plus({size: 20})}<span>Add</span></button>
-                        </div>
+                    <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-2" id="my-mantras-list">
+                        ${sortedMantras.map(mantra => renderMyMantraItem(mantra)).join('')}
                     </div>
-                </div>
-            `;
-        } else if (tab === 'my-affirmations') {
-            const aiGenerateButton = showAiFeatures ? `
-                <div class="my-4 text-center">
-                    ${renderButton(`${ICONS.Sparkles({className: 'inline-block mr-2', size: 20})} Generate with AI`, {
-                        variant: 'secondary',
-                        attributes: 'data-action="open-ai-affirmation-modal" title="Generate affirmations with AI"'
-                    })}
-                </div>
-            ` : '';
-
-            content = aiGenerateButton;
-
-             if (state.userAffirmations.length === 0) {
-                content += `
-                    <div class="text-center p-8">
-                        <p class="${colors.secondary} mb-4">Add your personal affirmations to see them here.</p>
+                    <div class="mt-6 text-center">
+                        ${renderButton(`${ICONS.Plus({className: 'inline mr-2'})} Create New Mantra`, { attributes: 'data-action="open-create-mantra-modal"' })}
                     </div>
                 `;
-            } else {
-                content += `<div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">${state.userAffirmations.map(affirmation => `
-                    <div class="glass-card p-4 flex justify-between items-center">
-                        <p>"${affirmation.text}"</p>
-                        <button data-action="remove-affirmation" data-affirmation-id='${affirmation.id}' class="ml-4 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Remove this affirmation" title="Remove affirmation">
-                           ${ICONS.Trash2({ size: 16 })}
-                        </button>
-                    </div>`).join('')}</div>`;
             }
-            content += `
-                <div class="mt-6 border-t ${colors.border} pt-4">
-                    <h3 class="text-lg font-semibold text-center mb-3">Add a New Affirmation</h3>
-                    <div class="space-y-2">
-                        <textarea id="new-affirmation-input" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} resize-none" placeholder="e.g., I am confident and capable." maxlength="150" rows="3"></textarea>
-                        <div class="flex justify-between items-center">
-                            <span id="char-count" class="text-xs ${colors.tertiary}">0/150</span>
-                            ${renderButton('Add Affirmation', { variant: 'secondary', attributes: 'data-action="add-new-affirmation" id="add-affirmation-btn" disabled' })}
-                        </div>
-                    </div>
+        } else if (tab === 'my-affirmations') {
+            const aiAffirmationButton = `
+                <div class="my-4 text-center">
+                    ${renderButton(`${ICONS.Sparkles({className: 'inline-block mr-2', size: 20})} Generate Affirmations with AI`, {
+                        variant: 'secondary', 
+                        attributes: 'data-action="open-ai-affirmation-modal"'
+                    })}
                 </div>
             `;
+
+            if (state.userAffirmations.length === 0) {
+                content = `<div class="text-center p-8"><p class="${colors.secondary}">You haven't added any affirmations. Affirmations are short, positive statements you can see once daily.</p></div>`;
+            } else {
+                 content = `
+                    <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+                    ${state.userAffirmations.map(affirm => `
+                        <div class="glass-card p-4 flex justify-between items-center">
+                            <p>"${affirm.text}"</p>
+                            <button data-action="delete-affirmation" data-affirmation-id="${affirm.id}" class="ml-4 p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Delete affirmation" title="Delete affirmation">
+                                ${ICONS.Trash2({size: 16})}
+                            </button>
+                        </div>
+                    `).join('')}
+                    </div>
+                 `;
+            }
+            content += aiAffirmationButton;
+            content += `
+                <div class="mt-6">
+                     <h3 class="text-lg font-serif text-center mb-3">Add New Affirmation</h3>
+                     <div class="flex gap-2">
+                        <input type="text" id="new-affirmation-input" placeholder="e.g., I am worthy of success." class="flex-grow ${colors.bgMuted} rounded-full py-2 px-4 ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
+                        <button data-action="add-affirmation" class="p-3 bg-teal text-white rounded-full">${ICONS.Plus({size: 20})}</button>
+                     </div>
+                </div>
+             `;
         }
         
         container.innerHTML = content;
-        
-        // Update active tab style
+
         document.querySelectorAll('[data-action="library-tab"]').forEach(btn => {
-            const isSelected = btn.dataset.tab === tab;
-            btn.classList.toggle('border-teal', isSelected);
-            btn.classList.toggle(colors.primary, isSelected);
-            btn.classList.toggle('border-transparent', !isSelected);
-            btn.classList.toggle(colors.tertiary, !isSelected);
+            const isTabActive = btn.dataset.tab === tab;
+            btn.classList.toggle('border-teal', isTabActive);
+            btn.classList.toggle(colors.primary, isTabActive);
+            btn.classList.toggle(colors.tertiary, !isTabActive);
+            btn.classList.toggle('border-transparent', !isTabActive);
         });
+    };
+
+    const renderMyMantraItem = (mantra) => {
+      const colors = getTextColorClasses();
+      const priorityColor = PRIORITIES[mantra.priority] || PRIORITIES['Medium'];
+
+      return `
+          <div class="glass-card p-4 space-y-3" id="mantra-item-${mantra.id}">
+              <div class="flex justify-between items-start">
+                  <p class="flex-grow text-lg">"${getMantraText(mantra)}"</p>
+                  <div class="flex gap-2 ml-2 flex-shrink-0">
+                      <button data-action="translate-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Translate mantra" title="Translate mantra with AI">
+                          ${ICONS.Globe({size: 18})}
+                      </button>
+                      <button data-action="proofread-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Proofread mantra" title="Proofread mantra with AI">
+                          ${ICONS.Languages({size: 18})}
+                      </button>
+                      <button data-action="edit-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Edit mantra" title="Edit mantra">
+                          ${ICONS.Edit({size: 18})}
+                      </button>
+                      <button data-action="delete-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Delete mantra" title="Delete mantra">
+                          ${ICONS.Trash2({size: 18})}
+                      </button>
+                  </div>
+              </div>
+              <div class="flex justify-between items-end">
+                  <div class="${colors.bgMuted20} inline-flex items-center px-3 py-1 rounded-full text-sm">
+                      <span class="w-2.5 h-2.5 ${priorityColor} rounded-full mr-2"></span>
+                      ${mantra.category} &bull; ${mantra.priority}
+                  </div>
+                  <div id="audio-controls-${mantra.id}">
+                    ${renderAudioInterface(mantra.id)}
+                  </div>
+              </div>
+          </div>
+      `;
     };
 
     const renderProgress = () => {
-        const totalViews = getTotalViews();
+        const colors = getTextColorClasses();
         const streak = getStreak();
         const longestStreak = getLongestStreak();
-        const mostViewedMantra = Object.entries(state.progress).sort(([,a],[,b]) => b.views - a.views)[0];
-        let mostViewedText = 'No views yet.';
-        const colors = getTextColorClasses();
-        if (mostViewedMantra) {
-            const mantra = state.userMantras.find(m => m.id === mostViewedMantra[0]) || CURATED_MANTRAS.find(m => m.id === mostViewedMantra[0]);
-            if (mantra) mostViewedText = `"${getMantraText(mantra)}" (${mostViewedMantra[1].views} views)`;
-        }
+        const totalViews = getTotalViews();
+        const today = formatDate(new Date());
 
-        const content = `
-            <div>
-                <h1 class="text-4xl font-serif text-center mb-6">Your Progress</h1>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Total Views</p><p class="text-2xl font-bold">${totalViews}</p></div>
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Current Streak</p><p class="text-2xl font-bold">${streak} Days</p></div>
-                    <div class="glass-card p-4 rounded-xl text-center"><p class="text-sm ${colors.secondary}">Longest Streak</p><p class="text-2xl font-bold">${longestStreak} Days</p></div>
-                </div>
-                <div class="glass-card p-4 rounded-xl mb-6"><p class="text-sm ${colors.secondary}">Most Frequent Mantra</p><p class="font-semibold">${mostViewedText}</p></div>
-
-                <div class="glass-card p-4 rounded-xl mb-6">
-                    <h2 class="text-xl font-semibold mb-4 text-center">Achievements (${state.achievements.filter(a=>a.unlocked).length}/${state.achievements.length})</h2>
-                    <div class="space-y-3">
-                    ${state.achievements.map(a => `
-                        <div class="flex items-center gap-4 ${a.unlocked ? '' : 'opacity-50'}">
-                            <div class="p-2 rounded-full ${a.unlocked ? 'bg-gold' : `${colors.bgMuted20}`}">${ICONS.Award({ color: a.unlocked ? '#fff' : 'currentColor' })}</div>
-                            <div>
-                                <p class="font-semibold">${a.title}</p>
-                                <p class="text-sm ${colors.secondary}">${a.description}</p>
-                            </div>
-                        </div>`).join('')}
-                    </div>
-                </div>
-
-                <div class="glass-card p-4 rounded-xl">
-                    <div id="calendar-container"></div>
-                </div>
-            </div>
-        `;
-        renderPage(content, { showBackButton: true });
-
-        // --- Interactive Calendar Rendering ---
-        const calendarContainer = document.getElementById('calendar-container');
-        
-        const renderCalendar = () => {
+        const calendarDays = () => {
+            let daysHtml = '';
             const year = calendarViewDate.getFullYear();
             const month = calendarViewDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
 
             const viewedDates = new Set(Object.values(state.progress).map(p => p.lastViewed));
-            const today = new Date();
-            const todayStr = formatDate(today);
 
-            const date = new Date(year, month);
-            const monthName = date.toLocaleString('default', { month: 'long' });
-            const yearNum = date.getFullYear();
-
-            const firstDayOfMonth = new Date(year, month, 1);
-            const startingDayOfWeek = firstDayOfMonth.getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            const daysOfWeekHeaders = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => 
-                `<div class="text-center text-xs ${colors.tertiary} font-semibold">${day}</div>`
-            ).join('');
-
-            let calendarCells = Array.from({ length: startingDayOfWeek }, () => '<div></div>').join('');
-
-            for (let day = 1; day <= daysInMonth; day++) {
-                const cellDate = new Date(year, month, day);
-                const dateStr = formatDate(cellDate);
-                const isToday = (dateStr === todayStr);
-                const wasViewed = viewedDates.has(dateStr);
-                
-                let cellClasses = 'w-8 h-8 flex items-center justify-center rounded-full text-xs transition-colors ';
-                if (isToday) cellClasses += `ring-2 ${colors.needsDarkText ? 'ring-charcoal' : 'ring-white'} `;
-                if (wasViewed) cellClasses += 'bg-teal text-white ';
-                else cellClasses += `${colors.bgMuted} `;
-                
-                calendarCells += `<div class="${cellClasses}">${day}</div>`;
+            const dayOfWeek = firstDay.getDay(); // Sunday - 0, Monday - 1, etc.
+            for (let i = 0; i < dayOfWeek; i++) {
+                daysHtml += '<div></div>';
             }
 
-            calendarContainer.innerHTML = `
-                <div class="flex justify-between items-center mb-4">
-                    <button data-action="prev-month" class="p-2 rounded-full ${colors.bgHover} transition-colors" aria-label="Previous month" title="Previous month">${ICONS.ArrowLeft({size: 20})}</button>
-                    <div class="text-center">
-                         <h2 class="text-xl font-semibold text-center">${monthName} ${yearNum}</h2>
-                         <button data-action="calendar-today" class="text-xs ${colors.accent} hover:underline">Go to Today</button>
-                    </div>
-                    <button data-action="next-month" class="p-2 rounded-full ${colors.bgHover} transition-colors" aria-label="Next month" title="Next month">${ICONS.ArrowRight({size: 20})}</button>
-                </div>
-                <div class="grid grid-cols-7 gap-y-2 place-items-center mt-2">
-                    ${daysOfWeekHeaders}
-                    ${calendarCells}
-                </div>
-            `;
-        };
-        
-        const updateCalendar = (offset) => {
-            calendarViewDate.setMonth(calendarViewDate.getMonth() + offset);
-            renderCalendar();
-        };
-
-        calendarContainer.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-action]');
-            if (!target) return;
-            const action = target.dataset.action;
-
-            if (action === 'prev-month') updateCalendar(-1);
-            if (action === 'next-month') updateCalendar(1);
-            if (action === 'calendar-today') {
-                calendarViewDate = new Date();
-                renderCalendar();
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const dateStr = formatDate(new Date(year, month, day));
+                const isViewed = viewedDates.has(dateStr);
+                const isToday = dateStr === today;
+                daysHtml += `<div class="h-10 flex items-center justify-center rounded-full ${isViewed ? 'bg-teal text-white font-bold' : ''} ${isToday && !isViewed ? `ring-2 ${colors.needsDarkText ? 'ring-charcoal' : 'ring-white'}` : ''}">${day}</div>`;
             }
-        });
-
-        renderCalendar();
-    };
-
-    const renderSettings = () => {
-        const s = state.settings;
-        const n = s.notifications;
-        const colors = getTextColorClasses();
-
-        const renderTimeSlot = (period) => {
-            const setting = n.mantras[period]; // { enabled: bool, time: 'HH:mm' }
-            return `
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="notif-${period}-enabled" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="enabled" ${setting.enabled ? 'checked' : ''} class="${colors.accentCheckbox} h-5 w-5 rounded">
-                        <label for="notif-${period}-enabled" class="capitalize">${period}</label>
-                    </div>
-                    <input type="time" value="${setting.time}" data-action="set-notification-prop" data-type="mantras" data-period="${period}" data-prop="time" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm w-24" ${!setting.enabled ? 'disabled' : ''}>
-                </div>`;
+            return daysHtml;
         };
-
-        const renderAiDefaultParamControls = () => {
-            const { creativity, tone, length } = s.aiSettings;
-            return `
-                 <div class="p-3 bg-black/20 rounded-lg space-y-3">
-                    <h3 class="font-semibold mb-2">Default AI Parameters</h3>
-                    <div class="flex justify-between items-center text-sm">
-                        <label for="ai-default-creativity">Creativity</label>
-                        <select id="ai-default-creativity" data-action="set-ai-setting" data-key="creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                            <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
-                            <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
-                            <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
-                        </select>
-                    </div>
-                     <div class="flex justify-between items-center text-sm">
-                        <label for="ai-default-tone">Tone</label>
-                        <select id="ai-default-tone" data-action="set-ai-setting" data-key="tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                            <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
-                            <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
-                            <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
-                            <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
-                        </select>
-                    </div>
-                     <div class="flex justify-between items-center text-sm">
-                        <label for="ai-default-length">Length</label>
-                        <select id="ai-default-length" data-action="set-ai-setting" data-key="length" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                            <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
-                            <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
-                            <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
-                        </select>
-                    </div>
-                </div>
-            `;
-        }
-
-        const AIStatusPanel = `
-            <div class="glass-card p-4 rounded-xl mb-4">
-              <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-                ${ICONS.Cpu({size: 20})}
-                On-Device AI System
-                ${!state.aiStatus.supported ? `<span class="px-2 py-1 text-xs rounded-full bg-rose-500 text-white">Unavailable</span>` : ''}
-              </h3>
-              
-              <div class="space-y-3 text-sm">
-                ${Object.entries({
-                    '🤖 AI Mantra Generation': state.aiStatus.text,
-                    '🌍 Real-time Translation': state.aiStatus.translator,
-                    '✨ Smart Rephrasing': state.aiStatus.rewriter,
-                    '✍️ Grammar Check': state.aiStatus.proofreader,
-                    '🎤 Multimodal Audio Input': state.aiStatus.assistant,
-                }).map(([label, isAvailable]) => `
-                <div class="flex justify-between items-center">
-                  <span>${label}</span>
-                  <span class="px-2 py-1 rounded-full ${isAvailable ? 'bg-teal' : 'bg-gray-500'} text-white text-xs">${isAvailable ? 'Available' : 'Unavailable'}</span>
-                </div>
-                `).join('')}
-              </div>
-
-              <div class="mt-3 p-3 bg-blue-500/20 rounded-lg">
-                <p class="text-xs ${colors.secondary}">
-                  <strong>Status:</strong> ${state.aiStatus.supported ? 'On-device AI detected.' : 'On-device AI not detected in your browser.'}
-                  ${!state.aiStatus.supported ? ' Enable demo mode to simulate these features.' : ''}
-                </p>
-              </div>
-            </div>
-        `;
         
-        const aiFeaturesSection = `
-            <div class="glass-card p-4 rounded-xl mb-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Sparkles({size: 20})} AI & Demo Mode</h2>
-                    <button data-action="toggle-ai-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.aiFeatures.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
-                        <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.aiFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                    </button>
-                </div>
-                
-                ${s.aiFeatures.enabled ? `
-                <div class="mt-3 pt-3 border-t ${colors.border} space-y-3">
-                    ${AIStatusPanel}
-
-                    ${renderAiDefaultParamControls()}
-
-                    <div class="flex justify-between items-center">
-                        <label for="language-select" class="flex items-center gap-2 text-sm">${ICONS.Languages({size: 16})} Language</label>
-                        <select id="language-select" data-action="set-language" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                            ${Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => `<option value="${code}" ${s.language === code ? 'selected' : ''}>${name}</option>`).join('')}
-                        </select>
-                    </div>
-
-                    <div class="flex justify-between items-center pt-3 border-t ${colors.border}">
-                        <div class="text-sm">
-                            <p class="font-semibold flex items-center gap-2">${ICONS.Microphone({size: 16})} AI Audio Input</p>
-                            <p class="${colors.secondary} text-xs">Use your voice to generate mantras.</p>
-                        </div>
-                        <button data-action="toggle-audio-input" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.audioInput.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.audioInput.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                    
-                    <div class="flex justify-between items-center pt-3 border-t ${colors.border}">
-                        <div class="text-sm">
-                            <p class="font-semibold">Demo Mode</p>
-                            <p class="${colors.secondary} text-xs">Simulate AI features if unavailable.</p>
-                        </div>
-                        <button data-action="toggle-demo-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.demoMode.enabled ? 'bg-teal' : `${colors.bgMuted20}`}">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.demoMode.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                    
-                    <div class="text-xs ${colors.tertiary} p-2 bg-black/20 rounded-lg">
-                        <p class="font-bold">Browser Info:</p>
-                        <p class="break-all">${navigator.userAgent}</p>
-                    </div>
-                </div>
-                ` : `
-                <p class="text-sm ${colors.secondary} mt-2">Enable to use on-device AI for generation, translation, and more.</p>
-                `}
-            </div>
-        `;
+        const unlockedAchievements = state.achievements.filter(a => a.unlocked);
 
         const content = `
-            <div class="max-w-lg mx-auto">
-                <h1 class="text-4xl font-serif text-center mb-6">Settings</h1>
-                
-                ${aiFeaturesSection}
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <h2 class="text-lg font-semibold mb-3">Theme</h2>
-                    <div class="grid grid-cols-2 gap-3">
-                        ${THEME_OPTIONS.map(theme => `
-                            <button data-action="set-theme" data-theme="${theme.id}" class="w-full h-16 rounded-lg border-2 ${s.theme === theme.id ? (colors.needsDarkText ? 'border-charcoal' : 'border-white') : 'border-transparent'}" style="background-image: ${theme.gradient};" aria-label="Set theme to ${theme.name}" title="Set theme to ${theme.name}">
-                                <span class="sr-only">${theme.name}</span>
-                            </button>
-                        `).join('')}
-                    </div>
+            <h1 class="text-4xl font-serif text-center mb-6">Your Progress</h1>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="glass-card p-4 text-center rounded-2xl">
+                    <p class="text-3xl font-bold">${streak}</p>
+                    <p class="${colors.secondary}">Day Streak</p>
                 </div>
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <h2 class="text-lg font-semibold mb-3">Font Style</h2>
-                     <div class="flex gap-3">
-                        ${FONT_OPTIONS.map(font => `<button data-action="set-font" data-font="${font.id}" class="flex-1 p-3 rounded-lg text-center ${s.font === font.id ? 'bg-white text-deep-purple' : `${colors.bgMuted20}`}" aria-label="Set font to ${font.name}" title="Set font to ${font.name}">${font.name}</button>`).join('')}
-                    </div>
+                 <div class="glass-card p-4 text-center rounded-2xl">
+                    <p class="text-3xl font-bold">${longestStreak}</p>
+                    <p class="${colors.secondary}">Longest Streak</p>
                 </div>
-                
-                <div class="glass-card p-4 rounded-xl mb-4 flex justify-between items-center">
-                    <h2 class="text-lg font-semibold">Dark Mode</h2>
-                    <button data-action="toggle-dark-mode" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.isDarkMode ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle dark mode" title="Toggle dark mode">
-                        <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.isDarkMode ? 'translate-x-6' : 'translate-x-0'}"></span>
-                    </button>
+                <div class="glass-card p-4 text-center rounded-2xl">
+                    <p class="text-3xl font-bold">${totalViews}</p>
+                    <p class="${colors.secondary}">Total Views</p>
                 </div>
+                <div class="glass-card p-4 text-center rounded-2xl">
+                    <p class="text-3xl font-bold">${state.userMantras.length}</p>
+                    <p class="${colors.secondary}">Active Mantras</p>
+                </div>
+            </div>
 
-                 <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Timer({size: 20})} Slideshow</h2>
-                        <button data-action="toggle-slideshow" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.slideshow.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle slideshow mode" title="Toggle slideshow mode">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.slideshow.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                     ${s.slideshow.enabled ? `
-                    <div class="text-sm mt-3 pt-3 border-t ${colors.border}">
-                         <div class="flex justify-between items-center">
-                            <label for="slideshow-interval">Display each mantra for</label>
-                            <select id="slideshow-interval" data-action="set-slideshow-interval" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                <option value="5" ${s.slideshow.interval === 5 ? 'selected' : ''}>5 seconds</option>
-                                <option value="6" ${s.slideshow.interval === 6 ? 'selected' : ''}>6 seconds</option>
-                                <option value="7" ${s.slideshow.interval === 7 ? 'selected' : ''}>7 seconds</option>
-                                <option value="10" ${s.slideshow.interval === 10 ? 'selected' : ''}>10 seconds</option>
-                                <option value="15" ${s.slideshow.interval === 15 ? 'selected' : ''}>15 seconds</option>
-                                <option value="30" ${s.slideshow.interval === 30 ? 'selected' : ''}>30 seconds</option>
-                            </select>
+            <div class="glass-card p-4 rounded-2xl mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <button data-action="prev-month" class="p-2 rounded-full ${colors.bgMuted} ${colors.bgHover}" aria-label="Previous month">${ICONS.ArrowLeft({})}</button>
+                    <h2 class="text-xl font-serif">${calendarViewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+                    <button data-action="next-month" class="p-2 rounded-full ${colors.bgMuted} ${colors.bgHover}" aria-label="Next month">${ICONS.ArrowRight({})}</button>
+                </div>
+                <div class="grid grid-cols-7 gap-2 text-center text-sm ${colors.secondary}">
+                    <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+                </div>
+                <div class="grid grid-cols-7 gap-2 mt-2">
+                    ${calendarDays()}
+                </div>
+            </div>
+
+            <div>
+                 <h2 class="text-2xl font-serif text-center mb-4">Achievements (${unlockedAchievements.length}/${state.achievements.length})</h2>
+                 <div class="space-y-3">
+                    ${state.achievements.map(a => `
+                        <div class="glass-card p-4 flex items-center gap-4 rounded-xl transition-opacity ${a.unlocked ? 'opacity-100' : 'opacity-50'}">
+                            <div class="${a.unlocked ? 'text-gold' : colors.secondary}">${ICONS.Award({size: 32})}</div>
+                            <div>
+                                <h3 class="font-bold">${a.title}</h3>
+                                <p class="text-sm ${colors.secondary}">${a.description}</p>
+                            </div>
                         </div>
-                    </div>` : `<p class="text-sm ${colors.secondary} mt-2">Enable to automatically cycle through your mantras on the dashboard.</p>`}
-                </div>
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Microphone({size: 20})} Voice Features</h2>
-                        <button data-action="toggle-voice-features" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.voiceFeatures.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" ${!isAudioSupported ? 'disabled' : ''} aria-label="Toggle voice recording features" title="Toggle voice recording features">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.voiceFeatures.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                    ${!isAudioSupported ? '<p class="text-sm text-yellow-300 mt-2">Your browser does not support audio recording.</p>' : ''}
-                </div>
-                
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Music4({size: 20})} Celebration Sounds</h2>
-                        <button data-action="toggle-celebration-sounds" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.celebrationSounds.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle celebration sounds" title="Toggle celebration sounds">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.celebrationSounds.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Vibrate({size: 20})} Haptic Feedback</h2>
-                        <button data-action="toggle-haptics" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${s.haptics.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle haptic feedback" title="Toggle haptic feedback">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${s.haptics.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                     <p class="text-sm ${colors.secondary} mt-2">Enable subtle vibrations for actions like swiping and button presses.</p>
-                </div>
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center mb-3">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Bell({size: 20})} Mantra Reminders</h2>
-                        <button data-action="set-notification-prop" data-type="mantras" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.mantras.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle mantra reminders" title="Toggle mantra reminders">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.mantras.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                    ${n.mantras.enabled ? `
-                    <div class="text-sm space-y-3 pt-2 border-t ${colors.border}">
-                        ${renderTimeSlot('morning')}
-                        ${renderTimeSlot('afternoon')}
-                        ${renderTimeSlot('evening')}
-                    </div>` : `<p class="text-sm ${colors.secondary}">Enable to get motivational mantra reminders.</p>`}
-                </div>
-
-                <div class="glass-card p-4 rounded-xl mb-4">
-                    <div class="flex justify-between items-center mb-3">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">${ICONS.Smile({size: 20})} Daily Affirmation Reminder</h2>
-                        <button data-action="set-notification-prop" data-type="affirmation" data-prop="enabled" class="w-14 h-8 flex items-center rounded-full p-1 transition-colors ${n.affirmation.enabled ? 'bg-teal' : `${colors.bgMuted20}`}" aria-label="Toggle daily affirmation reminder" title="Toggle daily affirmation reminder">
-                            <span class="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${n.affirmation.enabled ? 'translate-x-6' : 'translate-x-0'}"></span>
-                        </button>
-                    </div>
-                    ${n.affirmation.enabled ? `
-                    <div class="text-sm pt-2 border-t ${colors.border}">
-                        <div class="flex justify-between items-center">
-                            <label for="notif-affirmation-time">Reminder time</label>
-                            <input type="time" id="notif-affirmation-time" value="${n.affirmation.time}" data-action="set-notification-prop" data-type="affirmation" data-prop="time" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm w-24">
-                        </div>
-                    </div>` : `<p class="text-sm ${colors.secondary}">Enable to get a daily affirmation reminder.</p>`}
-                </div>
-
-                 ${deferredInstallPrompt ? `
-                    <div class="mt-6 text-center">
-                        ${renderButton('Install App', { attributes: 'data-action="install-pwa" title="Install MantraOS to your device"'})}
-                    </div>` : ''}
-
-                 <div class="glass-card p-4 rounded-xl mb-4">
-                    <h2 class="text-lg font-semibold mb-3">Data Management</h2>
-                    <div class="flex justify-between items-baseline mb-4 p-3 rounded-lg bg-black/10">
-                        <span class="text-sm ${colors.secondary}">Voice Recordings Storage Used:</span>
-                        <span class="text-lg font-bold text-teal">${getAudioStorageUsage()}</span>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <button data-action="export-data" class="flex-1 p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} transition-colors flex items-center justify-center gap-2" title="Export all your data to a JSON file">
-                            ${ICONS.Download({size: 20})} Export Data
-                        </button>
-                        <button data-action="import-data" class="flex-1 p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} transition-colors flex items-center justify-center gap-2" title="Import data from a JSON backup file">
-                            ${ICONS.Upload({size: 20})} Import Data
-                        </button>
-                        <input type="file" id="import-file-input" class="hidden" accept=".json">
-                    </div>
-                     <div class="mt-3">
-                        <button data-action="delete-all-recordings" class="w-full p-3 rounded-lg bg-rose-600/50 text-white hover:bg-rose-600/70 transition-colors flex items-center justify-center gap-2" title="Permanently delete all voice recordings">
-                            ${ICONS.Trash2({size: 20})} Delete All Recordings
-                        </button>
-                     </div>
-                </div>
-
-                 <div class="mt-6 text-center">
-                     <button data-action="reset-app" class="text-red-400 hover:text-red-300 transition-colors" title="Delete all data and reset the app">Reset Application Data</button>
+                    `).join('')}
                  </div>
             </div>
         `;
-        renderPage(content, { showBackButton: true, showUndoRedo: true });
-    };
-    
-    // --- SWIPE LOGIC ---
-    function setupSwipeListeners() {
-        const swipeArea = document.getElementById('swipe-area');
-        if (!swipeArea) return;
-        let startX = 0;
-        let isSwiping = false;
-
-        const handleSwipe = (diff) => {
-            if (Math.abs(diff) > 50) { // Threshold
-                resetSlideshowTimer();
-                renderTransitionParticles();
-                if(!audioPlayer.paused) stopPlayback();
-                if(currentlyRecordingMantraId) stopRecording();
-
-                let newIndex = state.currentMantraIndex;
-                if (diff > 0) { // Swipe Right
-                    newIndex = (state.currentMantraIndex - 1 + state.userMantras.length) % state.userMantras.length;
-                } else { // Swipe Left
-                    newIndex = (state.currentMantraIndex + 1) % state.userMantras.length;
-                }
-                if (newIndex !== state.currentMantraIndex) {
-                    state.currentMantraIndex = newIndex;
-                    hapticFeedback();
-                    // Animate text out, then render, then animate in
-                    const mantraText = document.getElementById('mantra-text');
-                    mantraText.style.opacity = '0';
-                    setTimeout(() => {
-                        renderDashboard(); // Re-render to update text and dots
-                    }, 150);
-                }
-            }
-        };
-        
-        swipeArea.addEventListener('touchstart', (e) => {
-            stopSlideshow();
-            startX = e.touches[0].clientX;
-            isSwiping = true;
-        }, { passive: true });
-        
-        swipeArea.addEventListener('touchmove', (e) => {
-            if (!isSwiping) return;
-            const currentX = e.touches[0].clientX;
-            const diff = currentX - startX;
-            const mantraText = document.getElementById('mantra-text');
-            if (!mantraText) return;
-            mantraText.style.transform = `translateX(${diff}px)`;
-            mantraText.style.opacity = `${1 - Math.abs(diff) / (window.innerWidth / 2)}`;
-        }, { passive: true });
-
-        swipeArea.addEventListener('touchend', (e) => {
-            if (!isSwiping) return;
-            isSwiping = false;
-            const endX = e.changedTouches[0].clientX;
-            handleSwipe(endX - startX);
-            // Reset style if not swiped enough
-            const mantraText = document.getElementById('mantra-text');
-            if (mantraText) {
-              mantraText.style.transform = 'translateX(0)';
-              mantraText.style.opacity = '1';
-            }
-        });
-        
-        // Pause slideshow on hover for desktop users
-        swipeArea.addEventListener('mouseenter', stopSlideshow);
-        swipeArea.addEventListener('mouseleave', startSlideshow);
-    }
-
-    // --- UNDO/REDO ---
-    const getActionDescription = (action) => {
-        switch (action.type) {
-            case 'ADD_MANTRA': return 'Mantra added.';
-            case 'REMOVE_MANTRA': return 'Mantra removed.';
-            case 'UPDATE_MANTRA_PRIORITY': return 'Priority updated.';
-            case 'UPDATE_MANTRA_TEXT': return 'Mantra updated.';
-            case 'ADD_AFFIRMATION': return 'Affirmation added.';
-            case 'REMOVE_AFFIRMATION': return 'Affirmation removed.';
-            case 'UPDATE_SETTING': return `Setting updated.`;
-            case 'SET_RECORDING': return 'Recording saved.';
-            case 'DELETE_RECORDING': return 'Recording deleted.';
-            default: return 'Action performed.';
-        }
+        renderPage(content, { showBackButton: true });
     };
 
-    const performAction = (action) => {
-        executeAction(action);
-        undoHistory.push(action);
-        redoHistory = [];
-        saveState();
-        router(); // Re-render current page
-        renderToast(getActionDescription(action), true);
-    };
-
-    const undo = () => {
-        if (undoHistory.length === 0) return;
-        const action = undoHistory.pop();
-        reverseAction(action);
-        redoHistory.push(action);
-        saveState();
-        router();
-        renderToast('Action undone.', false);
-    };
-
-    const redo = () => {
-        if (redoHistory.length === 0) return;
-        const action = redoHistory.pop();
-        executeAction(action);
-        undoHistory.push(action);
-        saveState();
-        router();
-        renderToast('Action redone.', false);
-    };
-    
-    const executeAction = (action) => {
-        const { type, payload } = action;
-        const mantraToUpdate = type === 'UPDATE_MANTRA_PRIORITY' || type === 'UPDATE_MANTRA_TEXT'
-            ? state.userMantras.find(m => m.id === payload.mantraId)
-            : null;
-
-        switch (type) {
-            case 'ADD_MANTRA':
-                state.userMantras.push(payload.mantra);
-                break;
-            case 'REMOVE_MANTRA':
-                state.userMantras = state.userMantras.filter(m => m.id !== payload.mantra.id);
-                if (state.audioRecordings[payload.mantra.id]) {
-                    delete state.audioRecordings[payload.mantra.id];
-                }
-                break;
-            case 'UPDATE_MANTRA_PRIORITY':
-                if (mantraToUpdate) mantraToUpdate.priority = payload.newPriority;
-                break;
-            case 'UPDATE_MANTRA_TEXT':
-                if (mantraToUpdate) mantraToUpdate.text = payload.newText;
-                break;
-            case 'ADD_AFFIRMATION':
-                state.userAffirmations.push(payload.affirmation);
-                break;
-            case 'REMOVE_AFFIRMATION':
-                state.userAffirmations = state.userAffirmations.filter(a => a.id !== payload.affirmation.id);
-                break;
-            case 'UPDATE_SETTING':
-                setNestedValue(state.settings, payload.key, payload.newValue);
-                applySettings();
-                break;
-            case 'SET_RECORDING':
-                state.audioRecordings[payload.mantraId] = payload.newRecording;
-                break;
-            case 'DELETE_RECORDING':
-                delete state.audioRecordings[payload.mantraId];
-                break;
-        }
-    };
-
-    const reverseAction = (action) => {
-        const { type, payload } = action;
-        const mantraToUpdate = type === 'UPDATE_MANTRA_PRIORITY' || type === 'UPDATE_MANTRA_TEXT'
-            ? state.userMantras.find(m => m.id === payload.mantraId)
-            : null;
-
-        switch (type) {
-            case 'ADD_MANTRA': // Undo adding is removing
-                state.userMantras = state.userMantras.filter(m => m.id !== payload.mantra.id);
-                break;
-            case 'REMOVE_MANTRA': // Undo removing is adding back
-                state.userMantras.splice(payload.index, 0, payload.mantra);
-                if (payload.recording) {
-                    state.audioRecordings[payload.mantra.id] = payload.recording;
-                }
-                break;
-            case 'UPDATE_MANTRA_PRIORITY':
-                if (mantraToUpdate) mantraToUpdate.priority = payload.oldPriority;
-                break;
-            case 'UPDATE_MANTRA_TEXT':
-                if (mantraToUpdate) mantraToUpdate.text = payload.oldText;
-                break;
-            case 'ADD_AFFIRMATION':
-                state.userAffirmations = state.userAffirmations.filter(a => a.id !== payload.affirmation.id);
-                break;
-            case 'REMOVE_AFFIRMATION':
-                state.userAffirmations.splice(payload.index, 0, payload.affirmation);
-                break;
-            case 'UPDATE_SETTING':
-                setNestedValue(state.settings, payload.key, payload.oldValue);
-                applySettings();
-                break;
-            case 'SET_RECORDING':
-                if (payload.oldRecording) {
-                    state.audioRecordings[payload.mantraId] = payload.oldRecording;
-                } else {
-                    delete state.audioRecordings[payload.mantraId];
-                }
-                break;
-            case 'DELETE_RECORDING':
-                state.audioRecordings[payload.mantraId] = payload.recording;
-                break;
-        }
-    };
-
-
-    // --- ROUTER ---
-    const router = () => {
-        const path = window.location.hash.slice(1) || '/';
-        
-        if (!state.isOnboardingComplete && !path.startsWith('/onboarding')) {
-            window.location.hash = '/onboarding/welcome';
-            return;
-        }
-
-        if (path.startsWith('/onboarding')) {
-            renderOnboarding(path.split('/')[2] || 'welcome');
-        } else {
-            applySettings();
-            switch (path) {
-                case '/library': renderLibrary(); break;
-                case '/progress': renderProgress(); break;
-                case '/settings': renderSettings(); break;
-                case '/affirmations': renderAffirmations(); break;
-                case '/dashboard': renderDashboard(); break;
-                default:
-                    window.location.hash = '/dashboard';
-            }
-        }
-    };
-    
-    // --- EVENT LISTENERS ---
-    document.addEventListener('input', e => {
-        const target = e.target;
-        const action = target.dataset.action;
-
-        if (action === 'set-notification-prop' && target.type === 'time') {
-            const type = target.dataset.type;
-            const period = target.dataset.period;
-            const prop = target.dataset.prop;
-            const value = target.value;
-            
-            if (type === 'affirmation') {
-                state.settings.notifications.affirmation[prop] = value;
-            } else if (type === 'mantras' && period) {
-                state.settings.notifications.mantras[period][prop] = value;
-            }
-            saveState();
-        } else if (target.id === 'new-affirmation-input') {
-            const charCount = document.getElementById('char-count');
-            const addBtn = document.getElementById('add-affirmation-btn');
-            if (charCount && addBtn) {
-                const count = target.value.length;
-                charCount.textContent = `${count}/150`;
-                addBtn.disabled = target.value.trim().length === 0;
-            }
-        } else if (target.id === 'new-custom-mantra-text') {
-            const charCountEl = document.getElementById('new-mantra-char-count');
-            const addBtn = document.getElementById('add-custom-mantra-btn');
-            const proofreadBtn = document.getElementById('proofread-mantra-btn');
-            const suggestBtn = document.getElementById('suggest-phrasing-btn');
-            if (charCountEl) {
-                const count = target.value.length;
-                charCountEl.textContent = `${count}/150`;
-                const hasText = target.value.trim().length > 0;
-                if(addBtn) addBtn.disabled = !hasText;
-                if(proofreadBtn) proofreadBtn.disabled = !hasText;
-                if(suggestBtn) suggestBtn.disabled = !hasText;
-            }
-        } else if (target.id === 'mantra-search-input') {
-            const searchTerm = target.value;
-            const activeCategoryButton = document.querySelector('[data-action="library-filter"][class*="bg-white"]');
-            const category = activeCategoryButton ? activeCategoryButton.dataset.category : CATEGORIES[0];
-            renderLibraryContent('curated', { category, searchTerm });
-        }
-    });
-
-    document.addEventListener('change', e => {
-        const target = e.target;
-        const action = target.dataset.action;
-        
-        if (target.id === 'import-file-input' && target.files.length > 0) {
-            const file = target.files[0];
-            const reader = new FileReader();
-
-            reader.onload = (event) => {
-                try {
-                    const importedData = JSON.parse(event.target.result);
-                    // Basic validation
-                    const requiredKeys = ['userMantras', 'settings', 'progress', 'isOnboardingComplete'];
-                    const hasRequiredKeys = requiredKeys.every(key => key in importedData);
-                    
-                    if (!hasRequiredKeys) {
-                        throw new Error('Invalid or corrupted backup file.');
-                    }
-
-                    renderConfirmationModal(
-                        'Confirm Import',
-                        'Importing will overwrite all current data. Are you sure you want to continue?',
-                        () => {
-                            // Overwrite state with imported data, providing defaults for any missing keys
-                            state = { ...state, ...importedData, settings: { ...defaultSettings, ...importedData.settings }};
-                            saveState();
-                            applySettings();
-                            alert('Data imported successfully! The app will now reload.');
-                            window.location.reload();
-                        },
-                        { confirmText: 'Import & Overwrite', confirmVariant: 'destructive' }
-                    );
-                } catch (error) {
-                    console.error('Failed to import data:', error);
-                    alert(`Import failed: ${error.message}`);
-                } finally {
-                    target.value = '';
-                }
-            };
-
-            reader.onerror = () => {
-                alert('Failed to read the selected file.');
-                target.value = '';
-            };
-
-            reader.readAsText(file);
-        }
-
-        if (action === 'set-mantra-sort') {
-            myMantrasSortOrder = target.value;
-            const activeFilterBtn = document.querySelector('[data-action="library-priority-filter"][class*="bg-white"]');
-            const priorityFilter = activeFilterBtn ? activeFilterBtn.dataset.priority : 'All';
-            renderLibraryContent('my-mantras', { priorityFilter });
-        }
-
-        if (action === 'set-slideshow-interval') {
-             performAction({
-                type: 'UPDATE_SETTING',
-                payload: { key: 'slideshow.interval', oldValue: state.settings.slideshow.interval, newValue: parseInt(target.value, 10) }
-            });
-        }
-
-        if (action === 'set-language') {
-            handleLanguageChange(target.value);
-        }
-        
-        if (action === 'set-ai-setting') {
-            const key = `aiSettings.${target.dataset.key}`;
-            const oldValue = getNestedValue(state.settings, key);
-            const newValue = target.value;
-            performAction({ type: 'UPDATE_SETTING', payload: { key, oldValue, newValue } });
-        }
-    });
-
-    document.addEventListener('click', async e => {
-        const target = e.target.closest('[data-action]');
-        if (!target) return;
-        
-        const action = target.dataset.action;
-        const mantraId = target.dataset.mantraId;
-        
-        hapticFeedback();
-
-        switch (action) {
-            case 'nav': window.location.hash = target.dataset.path; break;
-            case 'go-back': window.history.back(); break;
-            case 'undo': undo(); break;
-            case 'redo': redo(); break;
-            case 'filter-mantras': renderMantraSelectionList(target.dataset.category); break;
-            case 'library-filter': {
-                const searchTerm = document.getElementById('mantra-search-input')?.value || '';
-                renderLibraryContent('curated', { category: target.dataset.category, searchTerm });
-                break;
-            }
-            case 'library-priority-filter': {
-                const activeTab = document.querySelector('[data-action="library-tab"][class*="border-teal"]').dataset.tab;
-                renderLibraryContent(activeTab, { priorityFilter: target.dataset.priority });
-                break;
-            }
-            case 'toggle-onboarding-mantra': {
-                const mantra = CURATED_MANTRAS.find(m => m.id === mantraId);
-                const newMantra = { ...mantra, text: { original: mantra.text.original, translated: null } };
-                if (state.onboardingTempMantras.some(m => m.id === mantraId)) {
-                    state.onboardingTempMantras = state.onboardingTempMantras.filter(m => m.id !== mantraId);
-                } else {
-                    if (state.onboardingTempMantras.length >= 5) {
-                        renderModal('Limit Reached', 'You can select a maximum of 5 mantras.');
-                        return;
-                    }
-                    state.onboardingTempMantras.push(newMantra);
-                }
-                saveState();
-                renderOnboarding('mantras');
-                break;
-            }
-            case 'add-custom-onboarding': {
-                const textEl = document.getElementById('custom-mantra-text');
-                const catEl = document.getElementById('custom-mantra-category');
-                const prioEl = document.getElementById('custom-mantra-priority');
-                if (textEl.value.trim()) {
-                    const newMantra = { 
-                        id: `c-${Date.now()}`, 
-                        text: { original: textEl.value.trim(), translated: null },
-                        category: catEl.value, 
-                        priority: prioEl.value,
-                        createdAt: Date.now() 
-                    };
-                    state.onboardingTempMantras.push(newMantra);
-                    saveState();
-                    textEl.value = '';
-                    alert('Custom mantra added!');
-                }
-                break;
-            }
-            case 'finish-onboarding':
-                state.userMantras = state.onboardingTempMantras.map(m => ({ 
-                    ...m, 
-                    priority: m.priority || 'Medium',
-                    createdAt: m.createdAt || Date.now()
-                }));
-                state.isOnboardingComplete = true;
-                if (state.userMantras.length >= 3) unlockAchievement('3_mantras');
-                if (state.userMantras.some(m => m.id.startsWith('c-'))) unlockAchievement('custom_mantra');
-                state.onboardingTempMantras = [];
-                saveState();
-                window.location.hash = '/dashboard';
-                break;
-            case 'set-mantra-index': {
-                 const newIndex = parseInt(target.dataset.index, 10);
-                 if (newIndex === state.currentMantraIndex) break;
-                 
-                 resetSlideshowTimer();
-
-                 if(!audioPlayer.paused) stopPlayback();
-                 if(currentlyRecordingMantraId) stopRecording();
-
-                 state.currentMantraIndex = newIndex;
-                 const mantraText = document.getElementById('mantra-text');
-                 if (mantraText) {
-                     mantraText.style.opacity = '0';
-                     setTimeout(() => {
-                         renderDashboard();
-                     }, 150);
-                 } else {
-                     renderDashboard();
-                 }
-                 break;
-            }
-            case 'library-tab': 
-                undoHistory = []; redoHistory = []; // Clear history on tab change
-                renderLibraryContent(target.dataset.tab); 
-                break;
-            case 'toggle-library-mantra': {
-                 const isAdded = state.userMantras.some(m => m.id === mantraId);
-                 if (isAdded) {
-                     const mantraToRemove = state.userMantras.find(m => m.id === mantraId);
-                     const index = state.userMantras.findIndex(m => m.id === mantraId);
-                     const recording = state.audioRecordings[mantraId];
-                     performAction({ type: 'REMOVE_MANTRA', payload: { mantra: mantraToRemove, index, recording } });
-                 } else {
-                     const libMantra = CURATED_MANTRAS.find(m => m.id === mantraId);
-                     const mantraToAdd = { ...libMantra, text: { original: libMantra.text.original, translated: null }, priority: 'Medium', createdAt: Date.now() };
-                     performAction({ type: 'ADD_MANTRA', payload: { mantra: mantraToAdd } });
-                 }
-                 break;
-             }
-            case 'set-mantra-priority': {
-                const mantraToUpdate = state.userMantras.find(m => m.id === mantraId);
-                if (mantraToUpdate) {
-                    performAction({
-                        type: 'UPDATE_MANTRA_PRIORITY',
-                        payload: { mantraId, oldPriority: mantraToUpdate.priority, newPriority: target.dataset.priority }
-                    });
-                }
-                break;
-            }
-            case 'add-new-affirmation': {
-                const input = document.getElementById('new-affirmation-input');
-                if (input && input.value.trim()) {
-                    const newAffirmation = { id: `affirm-${Date.now()}`, text: input.value.trim() };
-                    performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
-                }
-                break;
-            }
-            case 'remove-affirmation': {
-                const affirmationToRemove = state.userAffirmations.find(a => a.id === target.dataset.affirmationId);
-                const index = state.userAffirmations.findIndex(a => a.id === target.dataset.affirmationId);
-                if(affirmationToRemove) {
-                    performAction({ type: 'REMOVE_AFFIRMATION', payload: { affirmation: affirmationToRemove, index }});
-                }
-                break;
-            }
-            case 'add-new-custom-mantra': {
-                const textInput = document.getElementById('new-custom-mantra-text');
-                const categoryInput = document.getElementById('new-custom-mantra-category');
-                const priorityInput = document.getElementById('new-custom-mantra-priority');
-                if (textInput && textInput.value.trim()) {
-                    const newMantra = { id: `c-${Date.now()}`, text: { original: textInput.value.trim(), translated: null }, category: categoryInput.value, priority: priorityInput.value, createdAt: Date.now() };
-                    performAction({ type: 'ADD_MANTRA', payload: { mantra: newMantra } });
-                    unlockAchievement('custom_mantra');
-                }
-                break;
-            }
-            case 'set-theme':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'theme', oldValue: state.settings.theme, newValue: target.dataset.theme }
-                });
-                break;
-            case 'set-font':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'font', oldValue: state.settings.font, newValue: target.dataset.font }
-                });
-                break;
-            case 'toggle-dark-mode':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'isDarkMode', oldValue: state.settings.isDarkMode, newValue: !state.settings.isDarkMode }
-                });
-                break;
-            case 'toggle-celebration-sounds':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'celebrationSounds.enabled', oldValue: state.settings.celebrationSounds.enabled, newValue: !state.settings.celebrationSounds.enabled }
-                });
-                break;
-            case 'toggle-haptics':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'haptics.enabled', oldValue: state.settings.haptics.enabled, newValue: !state.settings.haptics.enabled }
-                });
-                break;
-            case 'toggle-slideshow':
-                 performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'slideshow.enabled', oldValue: state.settings.slideshow.enabled, newValue: !state.settings.slideshow.enabled }
-                });
-                break;
-            case 'toggle-voice-features': 
-                 performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'voiceFeatures.enabled', oldValue: state.settings.voiceFeatures.enabled, newValue: !state.settings.voiceFeatures.enabled }
-                });
-                break;
-            case 'set-notification-prop': {
-                const type = target.dataset.type;
-                const period = target.dataset.period;
-                const prop = target.dataset.prop;
-                const path = type === 'affirmation' 
-                    ? `notifications.affirmation.${prop}` 
-                    : `notifications.mantras${period ? `.${period}` : ''}.${prop}`;
-                
-                const oldValue = getNestedValue(state.settings, path);
-                let newValue;
-
-                if (target.tagName.toLowerCase() === 'button') {
-                    newValue = !oldValue;
-                } else if (target.type === 'checkbox') {
-                    newValue = target.checked;
-                } else {
-                    newValue = target.value;
-                }
-
-                if(oldValue !== newValue) {
-                     performAction({ type: 'UPDATE_SETTING', payload: { key: path, oldValue, newValue } });
-                }
-                break;
-            }
-            case 'install-pwa':
-                if (deferredInstallPrompt) {
-                    deferredInstallPrompt.prompt();
-                    deferredInstallPrompt.userChoice.then(() => {
-                        deferredInstallPrompt = null;
-                        renderSettings();
-                    });
-                }
-                break;
-            case 'export-data': exportUserData(); break;
-            case 'import-data': document.getElementById('import-file-input')?.click(); break;
-            case 'reset-app':
-                renderConfirmationModal(
-                    'Confirm Reset',
-                    'Are you sure you want to delete all your data? This action is permanent and cannot be undone.',
-                    () => {
-                        Object.values(storageKeys).forEach(key => localStorage.removeItem(key));
-                        state = { userMantras: [], userAffirmations: [], settings: JSON.parse(JSON.stringify(defaultSettings)), progress: {}, isOnboardingComplete: false, achievements: INITIAL_ACHIEVEMENTS, currentMantraIndex: 0, onboardingTempMantras: [], dailyAffirmation: null, audioRecordings: {}, lastDailyGoalCelebrated: null, lastStreakMilestoneCelebrated: 0 };
-                        window.location.hash = '';
-                        window.location.reload();
-                    },
-                    { confirmText: 'Reset', confirmVariant: 'destructive' }
-                );
-                break;
-            // --- Audio Actions ---
-            case 'record-voice': startRecording(mantraId); break;
-            case 'stop-recording': stopRecording(); break;
-            case 'play-voice': playRecording(mantraId); break;
-            case 'pause-voice': pauseRecording(); break;
-            case 'stop-voice': stopPlayback(); break;
-            case 'delete-voice': deleteRecording(mantraId); break;
-            case 'delete-all-recordings':
-                renderConfirmationModal(
-                    'Delete All Recordings?',
-                    'This will permanently remove all of your voice recordings. This action cannot be undone.',
-                    () => {
-                        state.audioRecordings = {};
-                        saveState();
-                        renderSettings();
-                    },
-                    { confirmText: 'Delete All', confirmVariant: 'destructive' }
-                );
-                break;
-            // --- AI Actions ---
-            case 'toggle-ai-features':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'aiFeatures.enabled', oldValue: state.settings.aiFeatures.enabled, newValue: !state.settings.aiFeatures.enabled }
-                });
-                break;
-            case 'toggle-audio-input':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'audioInput.enabled', oldValue: state.settings.audioInput.enabled, newValue: !state.settings.audioInput.enabled }
-                });
-                break;
-             case 'toggle-demo-mode':
-                performAction({
-                    type: 'UPDATE_SETTING',
-                    payload: { key: 'demoMode.enabled', oldValue: state.settings.demoMode.enabled, newValue: !state.settings.demoMode.enabled }
-                });
-                break;
-            case 'recheck-ai':
-                renderLoadingModal("Re-checking AI status...");
-                await checkAiStatus();
-                closeLoadingModal();
-                renderSettings(); // Re-render the settings page with new status
-                break;
-            case 'test-ai':
-                renderLoadingModal("Testing AI...");
-                try {
-                    const session = await window.ai.createTextSession();
-                    const result = await session.prompt("Say 'hello'", { outputLanguage: 'en' });
-                    closeLoadingModal();
-                    if (result.toLowerCase().includes('hello')) {
-                        renderModal("AI Test Successful", "The on-device AI is working correctly.");
-                    } else {
-                        throw new Error("Unexpected response from AI.");
-                    }
-                } catch (e) {
-                    closeLoadingModal();
-                    console.error("AI Test Failed:", e);
-                    renderModal("AI Test Failed", `Could not get a valid response from the AI. Error: ${e.message}`);
-                }
-                break;
-            case 'open-ai-generate-modal': handleAiGenerate(); break;
-            case 'open-ai-affirmation-modal': handleAiAffirmationGenerate(); break;
-            case 'rewrite-mantra': handleAiRewrite(mantraId); break;
-            case 'proofread-mantra': handleAiProofread(); break;
-            case 'suggest-phrasing': handleAiSuggestPhrasing(); break;
-            case 'accept-proofread': {
-                const textInput = document.getElementById('new-custom-mantra-text');
-                textInput.value = target.dataset.suggestion;
-                document.getElementById('proofread-suggestion').classList.add('hidden');
-                // Trigger input event to re-validate buttons
-                textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                break;
-            }
-            case 'select-suggestion': {
-                const textInput = document.getElementById('new-custom-mantra-text');
-                textInput.value = target.dataset.text;
-                document.getElementById('ai-suggestion-container').innerHTML = '';
-                // Trigger input event to re-validate buttons and char count
-                textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                break;
-            }
-            case 'add-ai-affirmation': {
-                const newAffirmation = { id: `affirm-${Date.now()}`, text: target.dataset.text };
-                performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
-                target.innerHTML = ICONS.Check({size: 16});
-                target.disabled = true;
-                break;
-            }
-        }
-    });
-
-    // --- AUDIO PLAYER GLOBAL LISTENERS ---
-    audioPlayer.addEventListener('play', () => {
-        const controls = document.getElementById(`audio-controls-${currentlyPlayingMantraId}`);
-        if(controls) controls.innerHTML = renderAudioInterface(currentlyPlayingMantraId);
-    });
-    audioPlayer.addEventListener('pause', () => {
-        const controls = document.getElementById(`audio-controls-${currentlyPlayingMantraId}`);
-        if(controls) controls.innerHTML = renderAudioInterface(currentlyPlayingMantraId);
-        startSlideshow();
-    });
-    audioPlayer.addEventListener('ended', () => {
-        stopPlayback();
-    });
-    audioPlayer.addEventListener('timeupdate', () => {
-        const progressEl = document.querySelector(`.audio-progress-bar-inner[data-mantra-id="${currentlyPlayingMantraId}"]`);
-        if (progressEl) {
-            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100 || 0;
-            progressEl.style.width = `${progress}%`;
-        }
-    });
-
-    // --- KEYBOARD SHORTCUTS ---
-    document.addEventListener('keydown', e => {
-        if (e.ctrlKey || e.metaKey) {
-            if (e.key === 'z') {
-                e.preventDefault();
-                undo();
-            } else if (e.key === 'y') {
-                e.preventDefault();
-                redo();
-            }
-        }
-    });
-    
-    // --- FAKE AI (DEMO MODE) HANDLERS ---
-    const handleFakeAiGenerate = (topic, options) => {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const fakeMantras = [
-                    `[${options.tone}] A ${options.length} mantra about ${topic}. (Simulated)`,
-                    `[${options.tone}] Another ${options.length} mantra for ${topic}. (Simulated)`,
-                    `[${options.tone}] This is a ${options.length} ${topic} mantra. (Simulated)`,
-                    `[${options.tone}] My final ${options.length} mantra on ${topic}. (Simulated)`,
-                    `[${options.tone}] Your creative ${options.length} ${topic} mantra. (Simulated)`
-                ].map(m => m.replace('creative', options.creativity));
-                resolve(JSON.stringify(fakeMantras));
-            }, 800);
-        });
-    };
-
-    const handleFakeAiAffirmationGenerate = (topic, options) => {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const fakeAffirmations = [
-                    `I am a master of ${topic} and success flows to me. (Simulated)`,
-                    `My ${topic} grows stronger every single day. (Simulated)`,
-                    `I am confident in my ability to achieve great ${topic}. (Simulated)`,
-                    `I am worthy of all the good things that come from my ${topic}. (Simulated)`,
-                    `I attract positive outcomes in my ${topic}. (Simulated)`
-                ];
-                resolve(JSON.stringify(fakeAffirmations));
-            }, 800);
-        });
-    };
-
-    const handleFakeAiRewrite = (originalText, options) => {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const variants = [
-                    `[${options.tone}] Rephrased with ${options.creativity} creativity: ${originalText} (Simulated)`,
-                    `[${options.tone}] Alternative take using ${options.creativity}: ${originalText} (Simulated)`,
-                    `[${options.tone}] A final ${options.creativity} version: ${originalText} (Simulated)`
-                ];
-                resolve(JSON.stringify(variants));
-            }, 800);
-        });
-    };
-
-    const handleFakeAiSuggestPhrasing = (text) => {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                const suggestions = [
-                    `First suggestion for: ${text} (Simulated)`,
-                    `Second suggestion for: ${text} (Simulated)`,
-                    `A third way to say: ${text} (Simulated)`,
-                ];
-                resolve(JSON.stringify(suggestions));
-            }, 800);
-        });
-    };
-
-    const handleFakeAiProofread = (text) => {
-        return new Promise(resolve => {
-            setTimeout(() => {
-                let corrected = text.trim();
-                if (corrected.length > 0) {
-                    corrected = corrected.charAt(0).toUpperCase() + corrected.slice(1);
-                    if (!['.', '!', '?'].includes(corrected.slice(-1))) {
-                        corrected += '.';
-                    }
-                }
-                resolve({ correctedText: `${corrected} (Simulated)` });
-            }, 500);
-        });
-    };
-
-    const handleFakeLanguageChange = async (newLang) => {
-        const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
-        allMantras.forEach(mantra => {
-            if (mantra.text && mantra.text.original) {
-                mantra.text.translated = `[${newLang}] ${mantra.text.original} (Simulated)`;
-            }
-        });
-        saveState();
-    };
-
-    // --- AI FEATURE LOGIC ---
-    async function getAiTextSession() {
-        if (aiTextSession) return aiTextSession;
-        try {
-            aiTextSession = await window.ai.createTextSession();
-            return aiTextSession;
-        } catch (e) {
-            console.error("Failed to create AI text session:", e);
-            renderModal("AI Error", "Could not initialize the AI text session. Please try again later.");
-            return null;
-        }
-    }
-
-    const stopAiTopicRecording = () => {
-        if (aiTopicRecorder && aiTopicRecorder.state === 'recording') {
-            aiTopicRecorder.stop();
-        }
-        clearTimeout(aiTopicRecordingTimer);
-        clearInterval(aiTopicRecordingInterval);
-    };
-
-    const processAiAudio = async (audioBlob) => {
-        const contentContainer = document.getElementById('ai-generate-content');
-        if (!contentContainer) return;
-
-        contentContainer.innerHTML = `
-            <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="opacity-80">Analyzing audio and generating mantras...</p>`;
-
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.assistant;
-        
-        try {
-            let result;
-            if (isDemo) {
-                result = await handleFakeAiGenerate("a spoken demo topic", state.settings.aiSettings);
-            } else {
-                const promptResult = await window.ai.assistant.prompt(
-                    [
-                        { text: 'Transcribe this audio and generate 5 mantras about the topic spoken. Return the result as a valid JSON array of strings, with no other text or markdown.' },
-                        { audio: audioBlob }
-                    ],
-                    { outputLanguage: 'en' }
-                );
-                result = await promptResult.text();
-            }
-            unlockAchievement('audio_mantra');
-            displayGeneratedMantras(result, isDemo);
-        } catch (error) {
-            console.error("AI Audio Processing failed:", error);
-            displayGeneratedMantras(null, isDemo, true); // Pass error flag
-        }
-    };
-
-    const startAiTopicRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            const contentContainer = document.getElementById('ai-generate-content');
-            if (!contentContainer) { // Modal was closed
-                stream.getTracks().forEach(track => track.stop());
-                return;
-            }
-
-            contentContainer.innerHTML = `
-                <h2 class="text-2xl font-serif mb-4">Recording Topic...</h2>
-                <div class="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
-                    <div class="relative flex items-center justify-center w-20 h-20">
-                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 0s;"></div>
-                        <div class="absolute w-full h-full border-2 border-rose-500 rounded-full animate-pulse-ring" style="animation-delay: 1s;"></div>
-                        <button id="ai-stop-recording-btn" class="relative z-10 p-4 bg-rose-500 rounded-full flex-shrink-0 shadow-lg text-white" aria-label="Stop recording">
-                            ${ICONS.StopCircle({size: 24})}
-                        </button>
+    const renderSettings = () => {
+        const colors = getTextColorClasses();
+        const settings = state.settings;
+        const toggle = (path, label) => {
+            const isChecked = getNestedValue(settings, path);
+            return `
+                <label class="flex justify-between items-center cursor-pointer">
+                    <span>${label}</span>
+                    <div class="relative">
+                        <input type="checkbox" data-setting="${path}" class="sr-only peer" ${isChecked ? 'checked' : ''}>
+                        <div class="w-11 h-6 ${colors.bgMuted20} rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal"></div>
                     </div>
-                    <div id="ai-audio-timer" class="text-lg font-mono opacity-80 font-semibold">${MAX_AI_RECORDING_SECONDS}s left</div>
-                </div>
+                </label>
             `;
-            document.getElementById('ai-stop-recording-btn').addEventListener('click', stopAiTopicRecording);
+        };
+        const timeInput = (path, label) => {
+             const value = getNestedValue(settings, path);
+             return `
+                <div class="flex justify-between items-center">
+                    <span>${label}</span>
+                    <input type="time" data-setting="${path}" value="${value}" class="px-2 py-1 ${colors.bgMuted20} rounded-md focus:ring-2 ${colors.ring}">
+                </div>
+             `;
+        };
 
-            aiTopicChunks = [];
-            aiTopicRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-            
-            aiTopicRecorder.ondataavailable = event => aiTopicChunks.push(event.data);
-            aiTopicRecorder.onstop = () => {
-                const audioBlob = new Blob(aiTopicChunks, { type: 'audio/webm;codecs=opus' });
-                processAiAudio(audioBlob);
-                stream.getTracks().forEach(track => track.stop());
-            };
-            
-            aiTopicRecorder.start();
+        const content = `
+            <h1 class="text-4xl font-serif text-center mb-6">Settings</h1>
+            <div class="space-y-6 max-w-2xl mx-auto">
+                <div class="glass-card p-4 rounded-2xl">
+                    <h2 class="text-xl font-serif mb-3">Appearance</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="mb-2">Theme</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${THEME_OPTIONS.map(theme => `
+                                    <button data-setting="theme" data-value="${theme.id}" class="w-full p-2 rounded-lg text-left border-2 ${settings.theme === theme.id ? 'border-teal' : colors.border}">
+                                        <div class="w-full h-8 rounded" style="background: ${theme.gradient};"></div>
+                                        <p class="mt-1 text-sm">${theme.name}</p>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                         <div>
+                            <p class="mb-2">Font</p>
+                            <div class="flex gap-2">
+                                ${FONT_OPTIONS.map(font => `
+                                     <button data-setting="font" data-value="${font.id}" class="flex-1 p-3 rounded-lg text-center ${font.id === 'font-serif' ? 'font-serif' : ''} ${settings.font === font.id ? `bg-white ${colors.needsDarkText ? 'text-charcoal' : 'text-deep-purple'}` : colors.bgMuted20}">${font.name}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ${toggle('isDarkMode', 'Dark Mode')}
+                    </div>
+                </div>
 
-            aiTopicRecordingTimer = setTimeout(stopAiTopicRecording, MAX_AI_RECORDING_SECONDS * 1000);
-            
-            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
-            const timerEl = document.getElementById(`ai-audio-timer`);
-            if(timerEl) timerEl.textContent = `${secondsRemaining}s left`;
+                <div class="glass-card p-4 rounded-2xl">
+                     <h2 class="text-xl font-serif mb-3">Features</h2>
+                     <div class="space-y-3">
+                         ${toggle('voiceFeatures.enabled', 'Voice Recording')}
+                         ${toggle('celebrationSounds.enabled', 'Celebration Sounds')}
+                         ${toggle('haptics.enabled', 'Haptic Feedback')}
+                         <div class="flex justify-between items-center">
+                            <span>Slideshow Speed</span>
+                             <div class="flex items-center gap-2">
+                                <span class="text-sm">Slow</span>
+                                <input type="range" min="3" max="15" value="${settings.slideshow.interval}" data-setting="slideshow.interval" class="w-24 ${colors.accentCheckbox}">
+                                <span class="text-sm">Fast</span>
+                            </div>
+                         </div>
+                         ${toggle('slideshow.enabled', 'Enable Slideshow')}
+                     </div>
+                </div>
+                
+                <div class="glass-card p-4 rounded-2xl">
+                     <h2 class="text-xl font-serif mb-3">AI Features ${ICONS.Cpu({size: 20, className: 'inline -mt-1'})}</h2>
+                     <div class="space-y-3">
+                         ${toggle('aiFeatures.enabled', 'Enable On-Device AI')}
+                         ${toggle('demoMode.enabled', 'Enable Demo Mode')}
+                         <p class="text-xs ${colors.tertiary}">Enable demo mode if on-device AI is not available on your system.</p>
+                     </div>
+                </div>
 
-            aiTopicRecordingInterval = setInterval(() => {
-                secondsRemaining--;
-                const timerEl = document.getElementById(`ai-audio-timer`);
-                if (timerEl) timerEl.textContent = `${secondsRemaining}s left`;
-                if (secondsRemaining <= 0) clearInterval(aiTopicRecordingInterval);
-            }, 1000);
+                <div class="glass-card p-4 rounded-2xl">
+                     <h2 class="text-xl font-serif mb-3">Data Management</h2>
+                     <div class="grid grid-cols-2 gap-3">
+                        <button data-action="export-data" class="w-full p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} flex items-center justify-center gap-2">${ICONS.Download({size: 18})} Export</button>
+                        <button data-action="import-data" class="w-full p-3 rounded-lg ${colors.bgMuted20} ${colors.bgHover30} flex items-center justify-center gap-2">${ICONS.Upload({size: 18})} Import</button>
+                     </div>
+                     <div class="mt-4">
+                        <button data-action="reset-app" class="w-full p-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300">Reset Application</button>
+                     </div>
+                     <div class="mt-4 flex justify-between items-center">
+                         <p class="text-sm">Voice Storage: <span class="font-semibold">${getAudioStorageUsage()}</span></p>
+                         <button data-action="clear-audio" class="text-sm text-rose-400 hover:underline">Clear All</button>
+                     </div>
+                </div>
+            </div>
+        `;
 
-        } catch (err) {
-            console.error("Error accessing microphone for AI topic:", err);
-            const contentContainer = document.getElementById('ai-generate-content');
-            if (contentContainer) {
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Microphone Error</h2>
-                    <p class="opacity-80 mb-6">Could not access the microphone. Please grant permission and try again.</p>
-                    ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
-                const modalElement = document.getElementById('ai-generate-modal');
-                const closeModal = () => modalElement?.remove();
-                contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
-            }
-        }
+        renderPage(content, { showBackButton: true });
     };
     
-    function displayGeneratedMantras(jsonResult, isDemo, hasError = false) {
-        const contentContainer = document.getElementById('ai-generate-content');
-        if(!contentContainer) return;
-        const modalElement = document.getElementById('ai-generate-modal');
-        const closeModal = () => modalElement?.remove();
+    // --- AI MODALS AND HANDLERS ---
+    const renderAiAffirmationModal = () => {
         const colors = getTextColorClasses();
-        if (hasError) {
-             contentContainer.innerHTML = `
-                <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                <p class="${colors.secondary} mb-6">The AI could not process the request. Please try again later.</p>
-                ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
-            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
+        const modalId = 'ai-affirmation-modal';
+        document.getElementById(modalId)?.remove();
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-serif">Generate Affirmations</h2>
+                        <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full">&times;</button>
+                    </div>
+                    <p class="${colors.secondary} mb-4">Enter a topic, and the on-device AI will create affirmations for you.</p>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="ai-affirmation-topic" placeholder="e.g., Confidence, Calm, Success" class="flex-grow ${colors.bgMuted} rounded-full py-2 px-4 ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
+                        <button data-action="generate-ai-affirmations" class="p-3 bg-teal text-white rounded-full">${ICONS.Sparkles({size: 20})}</button>
+                    </div>
+                    
+                    <div id="ai-affirmation-results" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        <!-- Results will be injected here -->
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+
+    const renderTranslateModal = (mantra) => {
+        const colors = getTextColorClasses();
+        const modalId = 'translate-mantra-modal';
+        document.getElementById(modalId)?.remove();
+
+        const languageOptions = Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => 
+            `<option value="${code}" ${state.settings.language === code ? 'selected' : ''}>${name}</option>`
+        ).join('');
+
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-serif">Translate Mantra</h2>
+                        <button data-action="close-modal-by-id" data-modal-id="${modalId}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full">&times;</button>
+                    </div>
+                    <p class="${colors.secondary} mb-2">Original:</p>
+                    <p class="italic p-3 ${colors.bgMuted} rounded-lg mb-4">"${mantra.text.original}"</p>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <select id="translate-language-select" class="flex-grow ${colors.bgMuted} rounded-full py-2 px-4 focus:outline-none focus:ring-2 ${colors.ring}">${languageOptions}</select>
+                        <button data-action="perform-translation" data-mantra-id="${mantra.id}" class="p-3 bg-teal text-white rounded-full">${ICONS.Globe({size: 20})}</button>
+                    </div>
+
+                    <div id="translation-result-container" class="hidden">
+                         <p class="${colors.secondary} mb-2">Translation:</p>
+                         <p id="translation-result-text" class="italic p-3 ${colors.bgMuted} rounded-lg mb-4"></p>
+                         <div class="text-right">
+                            ${renderButton('Save Translation', { attributes: `data-action="save-translation" data-mantra-id="${mantra.id}"`})}
+                         </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    };
+
+    const handleGenerateAiAffirmations = async () => {
+        const topicInput = document.getElementById('ai-affirmation-topic');
+        const topic = topicInput.value.trim();
+        if (!topic) {
+            renderToast('Please enter a topic.');
             return;
         }
 
-        try {
-            const mantras = JSON.parse(jsonResult);
-            const modalTitle = isDemo 
-                ? `Generated Mantras <span class="text-sm text-teal-300">(Simulated)</span>` 
-                : 'Generated Mantras';
-            
-            contentContainer.innerHTML = `
-                <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
-                ${mantras.map((mantra) => `
-                    <div class="glass-card p-3 flex justify-between items-center">
-                        <p>"${mantra}"</p>
-                        <button data-action="add-ai-mantra" data-text="${String(mantra).replace(/ \(Simulated\)$/, '')}" class="ml-2 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Add this mantra" title="Add to My Mantras">${ICONS.Plus({size: 16})}</button>
-                    </div>`).join('')}
-                </div>
-                ${renderButton('Done', { attributes: 'data-action="close-ai-generate"' })}`;
-
-            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
-            contentContainer.querySelectorAll('[data-action="add-ai-mantra"]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const newMantra = { id: `c-${Date.now()}`, text: { original: e.currentTarget.dataset.text, translated: null }, category: 'AI Generated', priority: 'Medium', createdAt: Date.now() };
-                    performAction({ type: 'ADD_MANTRA', payload: { mantra: newMantra }});
-                    e.currentTarget.innerHTML = ICONS.Check({size: 16});
-                    e.currentTarget.disabled = true;
-                });
-            });
-        } catch (error) {
-            console.error("AI Generation failed (parsing result):", error);
-            contentContainer.innerHTML = `
-                <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                <p class="${colors.secondary} mb-6">The AI returned an invalid response. Please try a different topic or try again later.</p>
-                ${renderButton('Close', { attributes: 'data-action="close-ai-generate"' })}`;
-            contentContainer.querySelector('[data-action="close-ai-generate"]').addEventListener('click', closeModal);
-        }
-    }
-
-
-    async function handleAiGenerate() {
-        const modalId = 'ai-generate-modal';
-        const { creativity, tone, length } = state.settings.aiSettings;
-        const canRecord = (state.aiStatus.assistant || state.settings.demoMode.enabled) && state.settings.audioInput.enabled;
-        const colors = getTextColorClasses();
-
-        const modalHTML = `
-            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up" id="ai-generate-content">
-                    <h2 class="text-2xl font-serif mb-4 text-center">Generate Mantras</h2>
-                    <p class="${colors.secondary} mb-4 text-center">Speak a topic or type it below.</p>
-                    
-                    <div class="my-4 flex justify-center">
-                        <button id="ai-record-topic" ${!canRecord ? 'disabled' : ''} title="${!canRecord ? 'Audio input unavailable' : 'Record Topic'}" 
-                            class="w-24 h-24 flex items-center justify-center gap-2 p-3 rounded-full bg-teal text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative">
-                            <span class="${canRecord ? 'animate-pulse-ring' : ''} absolute inline-flex h-full w-full rounded-full bg-teal opacity-75" style="animation-duration: 2.5s; animation-iteration-count: infinite;"></span>
-                            <span class="relative">
-                              ${ICONS.Microphone({size: 40})}
-                            </span>
-                        </button>
-                    </div>
-
-                    <div class="my-4 flex items-center gap-2">
-                        <hr class="flex-grow ${colors.border}">
-                        <span class="text-xs ${colors.tertiary}">OR</span>
-                        <hr class="flex-grow ${colors.border}">
-                    </div>
-
-                    <input type="text" id="ai-topic-input" placeholder="e.g., confidence, health, wealth" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}">
-
-                    <details class="text-left mt-6">
-                        <summary class="cursor-pointer text-sm font-semibold ${colors.secondary}">Advanced Options</summary>
-                        <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
-                             <div class="flex justify-between items-center text-sm">
-                                <label for="ai-generate-creativity">Creativity</label>
-                                <select id="ai-generate-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                    <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
-                                    <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
-                                    <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
-                                </select>
-                            </div>
-                            <div class="flex justify-between items-center text-sm">
-                                <label for="ai-generate-tone">Tone</label>
-                                <select id="ai-generate-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                    <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
-                                    <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
-                                    <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
-                                    <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
-                                </select>
-                            </div>
-                            <div class="flex justify-between items-center text-sm">
-                                <label for="ai-generate-length">Length</label>
-                                <select id="ai-generate-length" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                    <option value="short" ${length === 'short' ? 'selected' : ''}>Short</option>
-                                    <option value="medium" ${length === 'medium' ? 'selected' : ''}>Medium</option>
-                                    <option value="long" ${length === 'long' ? 'selected' : ''}>Long</option>
-                                </select>
-                            </div>
-                        </div>
-                    </details>
-                    <div class="mt-6 text-center">
-                        ${renderButton('Generate from Text', { attributes: 'id="ai-generate-submit"' })}
-                    </div>
-                </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        const modalElement = document.getElementById(modalId);
-        const submitBtn = document.getElementById('ai-generate-submit');
-        const recordBtn = document.getElementById('ai-record-topic');
+        const resultsContainer = document.getElementById('ai-affirmation-results');
+        resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
         
-        const closeModal = () => modalElement?.remove();
-        modalElement.addEventListener('click', (e) => { if(e.target === modalElement) closeModal(); });
-
-        recordBtn.addEventListener('click', startAiTopicRecording);
-
-        submitBtn.addEventListener('click', async () => {
-            const topic = document.getElementById('ai-topic-input').value.trim();
-            if (!topic) return;
-            
-            const newCreativity = document.getElementById('ai-generate-creativity').value;
-            const newTone = document.getElementById('ai-generate-tone').value;
-            const newLength = document.getElementById('ai-generate-length').value;
-
-            state.settings.aiSettings = { creativity: newCreativity, tone: newTone, length: newLength };
-            saveState();
-
-            const contentContainer = document.getElementById('ai-generate-content');
-            contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="opacity-80">Generating mantras about ${topic}...</p>`;
-
-            const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
-            
+        let affirmations = [];
+        if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
             try {
-                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
-                const temperature = creativityMap[newCreativity] || 0.7;
-                
-                const prompt = `Generate 5 positive affirmations about "${topic}". They should have a ${newTone} tone and be ${newLength}. Return the result as a JSON array of strings.`;
-                
-                const result = isDemo 
-                    ? await handleFakeAiGenerate(topic, { creativity: newCreativity, tone: newTone, length: newLength }) 
-                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
-                
-                displayGeneratedMantras(result, isDemo);
-
-            } catch (error) {
-                console.error("AI Generation failed:", error);
-                displayGeneratedMantras(null, isDemo, true);
+                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                const prompt = `Generate 5 short, positive, first-person affirmations about "${topic}". Return only a JSON array of strings, like ["I am...", "I will..."].`;
+                const result = await aiTextSession.prompt(prompt);
+                affirmations = JSON.parse(result);
+            } catch (e) {
+                console.error('AI Affirmation Generation Error:', e);
+                affirmations = [`[Demo] I am successful and confident, inspired by ${topic}.`, `[Demo] I embrace the calm and peace that ${topic} brings.`];
+                renderToast('AI failed. Showing demo results.');
             }
-        });
-    }
-
-    async function handleAiAffirmationGenerate() {
-        const modalId = 'ai-affirmation-generate-modal';
-        const { creativity, tone, length } = state.settings.aiSettings;
-        const colors = getTextColorClasses();
-
-        const modalHTML = `
-            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                <div class="glass-card w-full max-w-md rounded-2xl p-6 text-center animate-slide-in-up" id="ai-affirmation-generate-content">
-                    <h2 class="text-2xl font-serif mb-4">Generate Affirmations</h2>
-                    <p class="${colors.secondary} mb-6">What personal theme would you like to focus on?</p>
-                    <input type="text" id="ai-topic-input" placeholder="e.g., self-love, career success" class="w-full p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring} mb-4">
-                    
-                    <details class="text-left mb-4">
-                        <summary class="cursor-pointer text-sm font-semibold ${colors.secondary}">Advanced Options</summary>
-                        <div class="mt-3 p-3 bg-black/20 rounded-lg space-y-3">
-                             <div class="flex justify-between items-center text-sm">
-                                <label for="ai-generate-creativity">Creativity</label>
-                                <select id="ai-generate-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                    <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
-                                    <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
-                                    <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
-                                </select>
-                            </div>
-                            <div class="flex justify-between items-center text-sm">
-                                <label for="ai-generate-tone">Tone</label>
-                                <select id="ai-generate-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                    <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
-                                    <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
-                                </select>
-                            </div>
-                        </div>
-                    </details>
-
-                    ${renderButton('Generate', { attributes: 'id="ai-affirmation-generate-submit"' })}
-                </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        const modalElement = document.getElementById(modalId);
-        const submitBtn = document.getElementById('ai-affirmation-generate-submit');
-        
-        const closeModal = () => modalElement?.remove();
-        modalElement.addEventListener('click', (e) => { if(e.target === modalElement) closeModal(); });
-
-        submitBtn.addEventListener('click', async () => {
-            const topic = document.getElementById('ai-topic-input').value.trim();
-            if (!topic) return;
-            
-            const newCreativity = document.getElementById('ai-generate-creativity').value;
-            const newTone = document.getElementById('ai-generate-tone').value;
-
-            state.settings.aiSettings.creativity = newCreativity;
-            state.settings.aiSettings.tone = newTone;
-            saveState();
-
-            const contentContainer = document.getElementById('ai-affirmation-generate-content');
-            contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="opacity-80">Generating affirmations about ${topic}...</p>`;
-
-            const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
-            
-            try {
-                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
-                const temperature = creativityMap[newCreativity] || 0.7;
-                
-                const prompt = `Generate 5 positive personal affirmations about "${topic}". Make them empowering, present-tense, and personal. Return the result as a JSON array of strings.`;
-                
-                const result = isDemo 
-                    ? await handleFakeAiAffirmationGenerate(topic) 
-                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
-                
-                const affirmations = JSON.parse(result);
-                
-                const modalTitle = isDemo 
-                    ? `Generated Affirmations <span class="text-sm text-teal-300">(Simulated)</span>` 
-                    : 'Generated Affirmations';
-                
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                    <div class="space-y-2 max-h-64 overflow-y-auto text-left mb-4">
-                    ${affirmations.map((affirm, index) => `
-                        <div class="glass-card p-3 flex justify-between items-center">
-                            <p>"${affirm}"</p>
-                            <button data-action="add-ai-affirmation" data-text="${String(affirm).replace(' (Simulated)', '')}" class="ml-2 p-2 rounded-full ${colors.bgMuted20} ${colors.bgHover30}" aria-label="Add this affirmation" title="Add to My Affirmations">${ICONS.Plus({size: 16})}</button>
-                        </div>`).join('')}
-                    </div>
-                    ${renderButton('Done', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
-
-                contentContainer.querySelector('[data-action="close-ai-affirmation-modal-final"]').addEventListener('click', closeModal);
-                contentContainer.querySelectorAll('[data-action="add-ai-affirmation"]').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const newAffirmation = { id: `affirm-${Date.now()}`, text: e.currentTarget.dataset.text };
-                        performAction({ type: 'ADD_AFFIRMATION', payload: { affirmation: newAffirmation }});
-                        e.currentTarget.innerHTML = ICONS.Check({size: 16});
-                        e.currentTarget.disabled = true;
-                    });
-                });
-            } catch (error) {
-                console.error("AI Affirmation Generation failed:", error);
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Generation Failed</h2>
-                    <p class="${colors.secondary} mb-6">The AI could not generate affirmations for this topic. Please try again.</p>
-                    ${renderButton('Close', { attributes: 'data-action="close-ai-affirmation-modal-final"' })}`;
-                contentContainer.querySelector('[data-action="close-ai-affirmation-modal-final"]').addEventListener('click', closeModal);
-            }
-        });
-    }
-
-    async function handleAiRewrite(mantraId) {
-        const mantra = state.userMantras.find(m => m.id === mantraId);
-        if (!mantra) return;
-
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
-        const modalId = 'ai-rewrite-modal';
-        const { creativity, tone } = state.settings.aiSettings;
-        const colors = getTextColorClasses();
-
-        const modalTitle = isDemo 
-            ? `Rephrase Mantra <span class="text-sm text-teal-300">(Simulated)</span>` 
-            : 'Rephrase Mantra';
-
-        const modalHTML = `
-            <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
-                <div class="glass-card w-full max-w-sm rounded-2xl p-6 text-center animate-slide-in-up" id="ai-rewrite-content">
-                    <h2 class="text-2xl font-serif mb-4">${modalTitle}</h2>
-                    <p class="${colors.secondary} italic mb-4">"${mantra.text.original}"</p>
-                    <div class="text-left mb-4 p-3 bg-black/20 rounded-lg space-y-3">
-                         <div class="flex justify-between items-center text-sm">
-                            <label for="ai-rewrite-creativity">Creativity</label>
-                            <select id="ai-rewrite-creativity" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                <option value="focused" ${creativity === 'focused' ? 'selected' : ''}>Focused</option>
-                                <option value="balanced" ${creativity === 'balanced' ? 'selected' : ''}>Balanced</option>
-                                <option value="creative" ${creativity === 'creative' ? 'selected' : ''}>Creative</option>
-                            </select>
-                        </div>
-                        <div class="flex justify-between items-center text-sm">
-                            <label for="ai-rewrite-tone">Tone</label>
-                            <select id="ai-rewrite-tone" class="${colors.bgMuted} border ${colors.border} rounded-md p-1 text-sm">
-                                <option value="inspirational" ${tone === 'inspirational' ? 'selected' : ''}>Inspirational</option>
-                                <option value="assertive" ${tone === 'assertive' ? 'selected' : ''}>Assertive</option>
-                                <option value="gentle" ${tone === 'gentle' ? 'selected' : ''}>Gentle</option>
-                                <option value="calm" ${tone === 'calm' ? 'selected' : ''}>Calm</option>
-                            </select>
-                        </div>
-                    </div>
-                    ${renderButton('Rephrase', { attributes: 'id="ai-rewrite-submit"'})}
-                    <button class="${colors.secondary} block w-full text-center mt-3" data-action="close-rewrite-modal">Cancel</button>
-                </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        
-        const modal = document.getElementById(modalId);
-        const closeModal = () => modal?.remove();
-        modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-        modal.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
-        
-        modal.querySelector('#ai-rewrite-submit').addEventListener('click', async () => {
-            const contentContainer = document.getElementById('ai-rewrite-content');
-            contentContainer.innerHTML = `
-                <div class="w-8 h-8 border-4 border-current/20 border-t-current rounded-full animate-spin mx-auto mb-4"></div>
-                <p class="opacity-80">Rephrasing your mantra...</p>`;
-
-            const newCreativity = document.getElementById('ai-rewrite-creativity').value;
-            const newTone = document.getElementById('ai-rewrite-tone').value;
-
-            // Save for next time
-            state.settings.aiSettings.creativity = newCreativity;
-            state.settings.aiSettings.tone = newTone;
-            saveState();
-
-            try {
-                const creativityMap = { focused: 0.2, balanced: 0.7, creative: 1.0 };
-                const temperature = creativityMap[newCreativity] || 0.7;
-
-                const prompt = `Rephrase the following mantra in 3 different ways with a ${newTone} tone: "${mantra.text.original}". Return the result as a JSON array of strings.`;
-                
-                const result = isDemo
-                    ? await handleFakeAiRewrite(mantra.text.original, { creativity: newCreativity, tone: newTone })
-                    : await (await getAiTextSession()).prompt(prompt, { temperature, outputLanguage: 'en' });
-                
-                const options = JSON.parse(result);
-
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4">Choose a New Phrasing</h2>
-                    <div class="space-y-3 mb-6">
-                        ${options.map(opt => `<button class="w-full text-left p-3 ${colors.bgMuted} ${colors.bgHover} rounded-lg" data-action="select-rewrite" data-text="${String(opt).replace(' (Simulated)', '')}">"${opt}"</button>`).join('')}
-                    </div>
-                    <button class="${colors.secondary}" data-action="close-rewrite-modal">Cancel</button>`;
-                
-                contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
-                contentContainer.querySelectorAll('[data-action="select-rewrite"]').forEach(btn => {
-                    btn.addEventListener('click', async (e) => {
-                        const newText = { original: e.currentTarget.dataset.text, translated: null };
-                        performAction({ type: 'UPDATE_MANTRA_TEXT', payload: { mantraId: mantra.id, oldText: mantra.text, newText } });
-                        
-                        if (state.settings.language !== 'en') {
-                            await translateSingleMantra(mantra.id, state.settings.language);
-                            saveState();
-                            router();
-                        }
-                        closeModal();
-                    });
-                });
-
-            } catch (error) {
-                console.error("AI Rewrite failed:", error);
-                contentContainer.innerHTML = `
-                    <h2 class="text-2xl font-serif mb-4 text-rose-400">Rewrite Failed</h2>
-                    <p class="${colors.secondary} mb-6">The AI could not rewrite this mantra. Please try again later.</p>
-                    ${renderButton('Close', { attributes: 'data-action="close-rewrite-modal"' })}`;
-                contentContainer.querySelector('[data-action="close-rewrite-modal"]').addEventListener('click', closeModal);
-            }
-        });
-    }
-
-    async function handleAiProofread() {
-        const textInput = document.getElementById('new-custom-mantra-text');
-        const text = textInput.value.trim();
-        if (!text) return;
-
-        const proofreadBtn = document.getElementById('proofread-mantra-btn');
-        proofreadBtn.disabled = true;
-        proofreadBtn.innerHTML = `<span class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin inline-block"></span>`;
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.proofreader;
-
-        try {
-            const { correctedText } = isDemo
-                ? await handleFakeAiProofread(text)
-                : await (await window.ai.proofreader.create()).proofread(text, { outputLanguage: 'en' });
-            
-            const suggestionContainer = document.getElementById('proofread-suggestion');
-            const originalText = correctedText.replace(' (Simulated)', '');
-
-            if (originalText.trim() !== text) {
-                suggestionContainer.innerHTML = `
-                    <span>Suggestion: <i class="font-semibold">"${correctedText}"</i></span>
-                    <button data-action="accept-proofread" data-suggestion="${originalText}" class="ml-2 px-2 py-0.5 text-xs rounded-full bg-teal text-white">Accept</button>`;
-                suggestionContainer.classList.remove('hidden');
-            } else {
-                suggestionContainer.innerHTML = `<span>${ICONS.Check({size: 16, className: 'inline'})} Looks good! ${isDemo ? '(Simulated)' : ''}</span>`;
-                suggestionContainer.classList.remove('hidden');
-                setTimeout(() => suggestionContainer.classList.add('hidden'), 2000);
-            }
-
-        } catch (error) {
-            console.error("AI Proofread failed:", error);
-            renderToast("Proofread failed. Please try again.", false);
-        } finally {
-            proofreadBtn.disabled = false;
-            proofreadBtn.innerHTML = `${ICONS.CheckCircle({size:20, className:'inline-block mr-2'})}Grammar`;
+        } else {
+            await new Promise(r => setTimeout(r, 1000)); // Simulate network
+            affirmations = [`[Demo] I am a master of ${topic}.`, `[Demo] My life is full of ${topic}.`, `[Demo] I attract positive ${topic} into my life.`];
         }
-    }
-
-    async function handleAiSuggestPhrasing() {
-        const textInput = document.getElementById('new-custom-mantra-text');
-        const text = textInput.value.trim();
-        if (!text) return;
-
-        const suggestBtn = document.getElementById('suggest-phrasing-btn');
-        const suggestionContainer = document.getElementById('ai-suggestion-container');
-        const colors = getTextColorClasses();
         
-        suggestBtn.disabled = true;
-        suggestBtn.innerHTML = `<span class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin inline-block"></span>`;
-        suggestionContainer.innerHTML = ''; // Clear previous suggestions
+        resultsContainer.innerHTML = affirmations.map(aff => {
+            return `<div class="glass-card p-3 flex justify-between items-center"><span>"${aff}"</span><button data-action="add-generated-affirmation" data-text="${encodeURIComponent(aff)}" class="p-2 bg-teal text-white rounded-full">${ICONS.Plus({size: 16})}</button></div>`;
+        }).join('');
+    };
 
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.text;
-
-        try {
-            const prompt = `Generate 3 alternative phrasings for the positive affirmation: "${text}". Keep them concise and empowering. Return the result as a JSON array of strings.`;
-            const result = isDemo
-                ? await handleFakeAiSuggestPhrasing(text)
-                : await (await getAiTextSession()).prompt(prompt, { outputLanguage: 'en' });
-
-            const suggestions = JSON.parse(result);
-            
-            if (suggestions && suggestions.length > 0) {
-                const suggestionHTML = suggestions.map(s => {
-                    const cleanText = String(s).replace(' (Simulated)', '');
-                    return `<button class="w-full text-left p-3 ${colors.bgMuted} ${colors.bgHover} rounded-lg text-sm" data-action="select-suggestion" data-text="${cleanText}">"${s}"</button>`;
-                }).join('');
-                
-                suggestionContainer.innerHTML = `
-                    <h4 class="text-sm font-semibold ${colors.secondary}">Suggestions${isDemo ? ' (Simulated)' : ''}:</h4>
-                    ${suggestionHTML}
-                `;
-            } else {
-                suggestionContainer.innerHTML = `<p class="text-sm ${colors.tertiary}">No suggestions found. Try a different phrasing.</p>`;
-            }
-
-        } catch (error) {
-            console.error("AI Suggestion failed:", error);
-            suggestionContainer.innerHTML = `<p class="text-sm text-rose-400">Could not get suggestions at this time.</p>`;
-        } finally {
-            suggestBtn.disabled = false;
-            suggestBtn.innerHTML = `${ICONS.Wand2({size:20, className:'inline-block mr-2'})}Suggest`;
-        }
-    }
-    
-    async function translateSingleMantra(mantraId, targetLang) {
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
+    const handlePerformTranslation = async (mantraId) => {
+        const select = document.getElementById('translate-language-select');
+        const targetLang = select.value;
         const mantra = state.userMantras.find(m => m.id === mantraId) || CURATED_MANTRAS.find(m => m.id === mantraId);
         if (!mantra) return;
 
-        if (isDemo) {
-            mantra.text.translated = `[${targetLang}] ${mantra.text.original} (Simulated)`;
-            return;
-        }
+        const resultContainer = document.getElementById('translation-result-container');
+        const resultTextEl = document.getElementById('translation-result-text');
+        resultContainer.classList.remove('hidden');
+        resultTextEl.innerHTML = `<div class="flex justify-center p-2"><div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
         
-        if (state.aiStatus.translator) {
+        let translatedText = '';
+        if (isAnyAiFeatureEnabled() && state.aiStatus.translator) {
             try {
                 if (!aiTranslator) aiTranslator = await window.ai.translator.create();
-                const result = await aiTranslator.translate(mantra.text.original, targetLang);
-                mantra.text.translated = result.translatedText;
+                const result = await aiTranslator.translate(mantra.text.original, 'en', targetLang);
+                translatedText = result.translatedText;
             } catch (e) {
-                console.error(`Failed to translate mantra ${mantraId}:`, e);
+                console.error("AI Translation Error:", e);
+                translatedText = `[Demo] Translation of "${mantra.text.original}" to ${targetLang}.`;
+                renderToast('AI failed. Showing demo result.');
+            }
+        } else {
+            await new Promise(r => setTimeout(r, 1000)); // Simulate network
+            translatedText = `[Demo] Translation of "${mantra.text.original}" to ${targetLang}.`;
+        }
+
+        resultTextEl.textContent = `"${translatedText}"`;
+        // Store it temporarily for saving
+        resultTextEl.dataset.translatedText = translatedText;
+    };
+
+    const handleSaveTranslation = (mantraId) => {
+        const resultTextEl = document.getElementById('translation-result-text');
+        const translatedText = resultTextEl.dataset.translatedText;
+
+        if (!translatedText) return;
+
+        const targetLang = document.getElementById('translate-language-select').value;
+        
+        // Check if it's a curated mantra or user mantra
+        const curatedMantra = CURATED_MANTRAS.find(m => m.id === mantraId);
+        if (curatedMantra) {
+            curatedMantra.text.translated = translatedText;
+            // Save to a separate localStorage item for curated translations
+            const savedCuratedTranslations = JSON.parse(localStorage.getItem(storageKeys.curatedTranslations)) || { lang: null, translations: {} };
+            savedCuratedTranslations.lang = targetLang;
+            savedCuratedTranslations.translations[mantraId] = translatedText;
+            localStorage.setItem(storageKeys.curatedTranslations, JSON.stringify(savedCuratedTranslations));
+        } else {
+            const userMantraIndex = state.userMantras.findIndex(m => m.id === mantraId);
+            if (userMantraIndex > -1) {
+                state.userMantras[userMantraIndex].text.translated = translatedText;
             }
         }
-    }
-
-    async function handleLanguageChange(newLang) {
-        const oldLang = state.settings.language;
-        if (oldLang === newLang) return;
-
-        performAction({ type: 'UPDATE_SETTING', payload: { key: 'language', oldValue: oldLang, newValue: newLang } });
         
-        if (newLang === 'en') {
-            router();
-            return;
+        saveState();
+        document.getElementById('translate-mantra-modal')?.remove();
+        renderToast('Translation saved!');
+        // Re-render the view to show the new text
+        const currentPath = window.location.hash.slice(1);
+        if (currentPath.startsWith('/library')) {
+            renderLibraryContent('my-mantras');
+        } else if (currentPath.startsWith('/dashboard')) {
+            renderDashboard();
         }
-        
-        const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
-        if (isDemo) {
-            renderLoadingModal(`Simulating translation to ${SUPPORTED_LANGUAGES[newLang]}...`);
-            await handleFakeLanguageChange(newLang);
-            closeLoadingModal();
-            router();
-            return;
-        }
-
-        renderLoadingModal(`Translating to ${SUPPORTED_LANGUAGES[newLang]}...`);
-        
-        try {
-            if (!aiTranslator) {
-                aiTranslator = await window.ai.translator.create();
-            }
-
-            const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
-            const promises = allMantras.map(async (mantra) => {
-                if (!mantra.text.original) return;
-                try {
-                    const { translatedText } = await aiTranslator.translate(mantra.text.original, newLang);
-                    mantra.text.translated = translatedText;
-                } catch(e) {
-                    console.warn(`Could not translate: "${mantra.text.original}"`, e);
-                    mantra.text.translated = mantra.text.original + ' (translation unavailable)';
-                }
-            });
-
-            await Promise.all(promises);
-            saveState();
-
-        } catch (e) {
-            console.error("Translation failed:", e);
-            renderModal("Translation Failed", "Could not translate mantras. Please try again.");
-        } finally {
-            closeLoadingModal();
-            router();
-        }
-    }
-
-    async function initAiFeatures() {
-        await checkAiStatus();
-        
-        if (state.settings.language === 'auto') {
-            const lang = navigator.language.split('-')[0];
-            if (SUPPORTED_LANGUAGES[lang]) {
-                state.settings.language = lang;
-            } else {
-                state.settings.language = 'en';
-            }
-        }
-
-        if (state.settings.language !== 'en' && state.settings.aiFeatures.enabled) {
-            const needsTranslation = CURATED_MANTRAS.some(m => !m.text.translated) || state.userMantras.some(m => !m.text.translated && m.text.original);
-            if(needsTranslation) {
-                const newLang = state.settings.language;
-                const isDemo = state.settings.demoMode.enabled && !state.aiStatus.translator;
-                if(isDemo) {
-                    await handleFakeLanguageChange(newLang);
-                } else if (state.aiStatus.translator) {
-                     try {
-                        if (!aiTranslator) aiTranslator = await window.ai.translator.create();
-                        const allMantras = [...state.userMantras, ...CURATED_MANTRAS];
-                        const promises = allMantras.map(async (mantra) => {
-                            if (mantra.text.original && !mantra.text.translated) {
-                                try {
-                                    const { translatedText } = await aiTranslator.translate(mantra.text.original, newLang);
-                                    mantra.text.translated = translatedText;
-                                } catch(e) { console.warn(`Could not translate: "${mantra.text.original}"`, e); }
-                            }
-                        });
-                        await Promise.all(promises);
-                        saveState();
-                     } catch(e) { console.error("Initial translation failed", e); }
-                }
-            }
-        }
-    }
-
-
-    // --- INITIALIZATION ---
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredInstallPrompt = e;
-        if (window.location.hash.slice(1) === '/settings') {
-            renderSettings();
-        }
-    });
-
-    window.addEventListener('hashchange', () => {
+    };
+    
+    // --- APP ROUTING & INITIALIZATION ---
+    const handleHashChange = () => {
+      const path = window.location.hash.slice(1) || '/';
       stopSlideshow();
-      if (!audioPlayer.paused) stopPlayback();
-      if (currentlyRecordingMantraId) stopRecording();
-      undoHistory = []; // Clear history on page navigation
-      redoHistory = [];
-      router();
-    });
+      stopPlayback();
+      
+      if (path.startsWith('/onboarding')) {
+        const step = path.split('/')[2] || 'welcome';
+        renderOnboarding(step);
+      } else if (!state.isOnboardingComplete) {
+        window.location.hash = '/onboarding/welcome';
+      } else {
+        switch(path) {
+          case '/dashboard':
+          case '/':
+            renderDashboard();
+            break;
+          case '/affirmations':
+            renderAffirmations();
+            break;
+          case '/library':
+            renderLibrary();
+            break;
+          case '/progress':
+            renderProgress();
+            break;
+          case '/settings':
+            renderSettings();
+            break;
+          default:
+            window.location.hash = '/dashboard';
+        }
+      }
+    };
 
-    document.addEventListener('DOMContentLoaded', () => {
-        // ServiceWorker registration removed to prevent cross-origin errors in hosted environments.
-        // Offline capability is handled via localStorage.
-        loadState();
-        if(!isAudioSupported) {
-          state.settings.aiFeatures.enabled = false;
-        }
-        if (!isAudioSupported) {
-            state.settings.voiceFeatures.enabled = false;
-        }
-        initAiFeatures().then(() => {
-            router();
+    const setupSwipeListeners = () => {
+        const swipeArea = document.getElementById('swipe-area');
+        if (!swipeArea) return;
+
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const handleSwipe = () => {
+            stopSlideshow();
+            const threshold = 50; // min swipe distance
+            if (touchEndX < touchStartX - threshold) { // Swiped left
+                goToNextMantra();
+            }
+            if (touchEndX > touchStartX + threshold) { // Swiped right
+                const newIndex = (state.currentMantraIndex - 1 + state.userMantras.length) % state.userMantras.length;
+                state.currentMantraIndex = newIndex;
+                renderTransitionParticles();
+                
+                const mantraText = document.getElementById('mantra-text');
+                if (mantraText) {
+                    mantraText.style.opacity = '0';
+                    setTimeout(renderDashboard, 150);
+                } else {
+                    renderDashboard();
+                }
+            }
+        };
+
+        swipeArea.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        swipeArea.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+    };
+
+    const setupEventListeners = () => {
+        document.body.addEventListener('click', e => {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+            
+            const action = target.dataset.action;
+            const mantraId = target.dataset.mantraId;
+            
+            hapticFeedback();
+
+            switch(action) {
+                case 'nav':
+                    window.location.hash = target.dataset.path;
+                    break;
+                case 'go-back':
+                    window.history.back();
+                    break;
+                case 'close-modal-by-id':
+                    document.getElementById(target.dataset.modalId)?.remove();
+                    break;
+                case 'finish-onboarding':
+                    state.isOnboardingComplete = true;
+                    state.userMantras = [...state.onboardingTempMantras];
+                    if (state.userMantras.length >= 3) unlockAchievement('3_mantras');
+                    if (state.userMantras.some(m => m.isCustom)) unlockAchievement('custom_mantra');
+                    state.onboardingTempMantras = [];
+                    saveState();
+                    window.location.hash = '/dashboard';
+                    break;
+                case 'library-tab':
+                    renderLibraryContent(target.dataset.tab);
+                    break;
+                case 'record-voice':
+                    startRecording(mantraId);
+                    break;
+                case 'stop-recording':
+                    stopRecording();
+                    break;
+                case 'play-voice':
+                    playRecording(mantraId);
+                    break;
+                case 'pause-voice':
+                    pauseRecording();
+                    break;
+                case 'stop-voice':
+                    stopPlayback();
+                    break;
+                case 'delete-voice':
+                    deleteRecording(mantraId);
+                    break;
+                case 'set-mantra-index':
+                    stopSlideshow();
+                    state.currentMantraIndex = parseInt(target.dataset.index, 10);
+                    renderDashboard();
+                    break;
+                case 'open-ai-affirmation-modal':
+                    renderAiAffirmationModal();
+                    break;
+                case 'generate-ai-affirmations':
+                    handleGenerateAiAffirmations();
+                    break;
+                case 'add-generated-affirmation': {
+                    const text = decodeURIComponent(target.dataset.text);
+                    const newAffirmation = { id: `aff_${Date.now()}`, text: text };
+                    state.userAffirmations.push(newAffirmation);
+                    saveState();
+                    renderToast('Affirmation added!');
+                    target.innerHTML = ICONS.Check({size: 16});
+                    target.disabled = true;
+                    break;
+                }
+                case 'translate-mantra': {
+                    const mantraToTranslate = state.userMantras.find(m => m.id === mantraId) || CURATED_MANTRAS.find(m => m.id === mantraId);
+                    if (mantraToTranslate) {
+                        renderTranslateModal(mantraToTranslate);
+                    }
+                    break;
+                }
+                case 'perform-translation':
+                    handlePerformTranslation(mantraId);
+                    break;
+                case 'save-translation':
+                    handleSaveTranslation(mantraId);
+                    break;
+            }
         });
-    });
+
+        document.body.addEventListener('change', e => {
+            const target = e.target.closest('[data-setting]');
+             if (target) {
+                const path = target.dataset.setting;
+                let value;
+                if (target.type === 'checkbox') {
+                    value = target.checked;
+                } else {
+                    value = target.type === 'range' ? parseInt(target.value, 10) : target.value;
+                }
+                setNestedValue(state.settings, path, value);
+                applySettings();
+                saveState();
+                return;
+            }
+        });
+
+        audioPlayer.addEventListener('timeupdate', () => {
+            if (!currentlyPlayingMantraId) return;
+            const bar = document.querySelector(`.audio-progress-bar-inner[data-mantra-id="${currentlyPlayingMantraId}"]`);
+            if (bar) {
+                const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                bar.style.width = `${progress}%`;
+            }
+        });
+        audioPlayer.addEventListener('ended', stopPlayback);
+    };
+
+    const initApp = () => {
+        loadState();
+        applySettings();
+        checkAiStatus();
+        handleHashChange();
+        setupEventListeners();
+
+        window.addEventListener('hashchange', handleHashChange);
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+        });
+    };
+
+    initApp();
 
   </script>
 </body>
