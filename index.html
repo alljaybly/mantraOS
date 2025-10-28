@@ -228,6 +228,7 @@
         Globe: createIcon('Globe', '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-2z"></path>'),
         Wand2: createIcon('Wand2', '<path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M11.8 17.8 13 19"/><path d="M19 11.8 17.8 13"/><path d="M13 11.8 11.8 13"/><path d="m21.1 12.3-1.1 1.1a4.9 4.9 0 0 1-7 7l-1.8-1.8a4.9 4.9 0 0 1 7-7l1.1-1.1Z"/><path d="M3 21a2.4 2.4 0 0 1 0-3.4l3.1-3.1"/>'),
         Cpu: createIcon('Cpu', '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>'),
+        Volume2: createIcon('Volume2', '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>'),
     };
 
     // --- COLOR & THEME UTILS ---
@@ -366,6 +367,7 @@
     let redoHistory = [];
     let toastTimeout = null;
     let isRecordingAiTopic = false;
+    let currentlySpeakingIdentifier = null;
 
 
     const defaultSettings = {
@@ -937,7 +939,7 @@
             currentlyRecordingMantraId = null;
             startSlideshow(); // Resume slideshow on error to prevent UI freeze
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderModal('Microphone Permission Required', 'Please allow microphone access in your browser settings to record voice mantras.');
+                renderModal('Microphone Permission Required', 'To record a voice mantra, MantraOS needs microphone access. Please update the permission in your browser\'s site settings (usually via the lock icon in the address bar).');
             } else {
                 renderModal('Microphone Error', 'Could not access the microphone. Please ensure your microphone is connected and try again.');
             }
@@ -1643,11 +1645,18 @@
             ` : '';
             
             const canRewrite = isAnyAiFeatureEnabled();
-            const rephraseButton = canRewrite ? `
-                <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="absolute top-2 right-2 p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
-                    ${ICONS.Wand2({size: 20})}
-                </button>
-            ` : '';
+            const topActions = `
+                <div class="absolute top-2 right-2 flex gap-2">
+                    ${canRewrite ? `
+                        <button data-action="rewrite-mantra" data-mantra-id="${currentMantra?.id}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Rephrase this mantra using AI" title="Rephrase mantra">
+                            ${ICONS.Wand2({size: 20})}
+                        </button>
+                    ` : ''}
+                    <button data-action="speak-mantra" data-identifier="${currentMantra?.id}" data-text="${encodeURIComponent(getMantraText(currentMantra))}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Listen to this mantra" title="Listen to mantra">
+                        ${currentlySpeakingIdentifier === currentMantra?.id ? ICONS.Music4({size: 20}) : ICONS.Volume2({size: 20})}
+                    </button>
+                </div>
+            `;
 
             content = `
                 <div class="flex flex-col h-[calc(100vh-8rem)] justify-between">
@@ -1660,7 +1669,7 @@
                   ${dailyAffirmationHtml}
 
                   <div id="swipe-area" class="flex-grow flex items-center justify-center relative overflow-hidden">
-                    ${rephraseButton}
+                    ${topActions}
                     <p id="mantra-text" class="text-4xl md:text-6xl font-serif text-center leading-tight animate-fade-in animate-float">"${getMantraText(currentMantra)}"</p>
                   </div>
                   <div class="text-center">
@@ -1879,6 +1888,9 @@
               <div class="flex justify-between items-start">
                   <p class="flex-grow text-lg">"${getMantraText(mantra)}"</p>
                   <div class="flex gap-2 ml-2 flex-shrink-0">
+                      <button data-action="speak-mantra" data-identifier="${mantra.id}" data-text="${encodeURIComponent(getMantraText(mantra))}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Listen to mantra" title="Listen to mantra">
+                          ${currentlySpeakingIdentifier === mantra.id ? ICONS.Music4({size: 18}) : ICONS.Volume2({size: 18})}
+                      </button>
                       ${canUseAi ? `
                           <button data-action="rewrite-mantra" data-mantra-id="${mantra.id}" class="p-2 ${colors.bgMuted20} ${colors.bgHover30} rounded-full" aria-label="Rephrase with AI" title="Rephrase with AI">
                               ${ICONS.Wand2({size: 18})}
@@ -2296,6 +2308,7 @@
 
         const resultsContainer = document.getElementById('ai-generate-results');
         resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+        const colors = getTextColorClasses();
         
         let mantras = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
@@ -2333,10 +2346,15 @@ Example for topic "wealth":
             const isAdded = state.userMantras.some(m => m.text.original.toLowerCase() === mantra.toLowerCase());
             const uniqueId = `add-gen-btn-${btoa(mantra)}`;
             return `<div class="glass-card p-3 flex justify-between items-center">
-                        <span>"${mantra}"</span>
-                        <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="mantra" data-text="${encodeURIComponent(mantra)}" class="p-2 bg-teal text-white rounded-full ${isAdded ? 'opacity-50' : ''}" ${isAdded ? 'disabled' : ''}>
-                            ${isAdded ? ICONS.Check({size: 16}) : ICONS.Plus({size: 16})}
-                        </button>
+                        <span class="flex-grow pr-2">"${mantra}"</span>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                             <button data-action="speak-mantra" data-identifier="${btoa(mantra)}" data-text="${encodeURIComponent(mantra)}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Listen to suggestion" title="Listen">
+                                ${ICONS.Volume2({size: 16})}
+                             </button>
+                            <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="mantra" data-text="${encodeURIComponent(mantra)}" class="p-2 bg-teal text-white rounded-full ${isAdded ? 'opacity-50' : ''}" ${isAdded ? 'disabled' : ''}>
+                                ${isAdded ? ICONS.Check({size: 16}) : ICONS.Plus({size: 16})}
+                            </button>
+                        </div>
                     </div>`;
         }).join('');
     };
@@ -2351,6 +2369,7 @@ Example for topic "wealth":
 
         const resultsContainer = document.getElementById('ai-affirmation-results');
         resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+        const colors = getTextColorClasses();
         
         let affirmations = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
@@ -2385,10 +2404,15 @@ Example for topic "gratitude":
         resultsContainer.innerHTML = affirmations.map(aff => {
             const uniqueId = `add-gen-btn-${btoa(aff)}`;
             return `<div class="glass-card p-3 flex justify-between items-center">
-                        <span>"${aff}"</span>
-                        <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="affirmation" data-text="${encodeURIComponent(aff)}" class="p-2 bg-teal text-white rounded-full">
-                            ${ICONS.Plus({size: 16})}
-                        </button>
+                        <span class="flex-grow pr-2">"${aff}"</span>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                             <button data-action="speak-mantra" data-identifier="${btoa(aff)}" data-text="${encodeURIComponent(aff)}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Listen to suggestion" title="Listen">
+                                ${ICONS.Volume2({size: 16})}
+                             </button>
+                            <button id="${uniqueId}" data-action="open-ai-confirmation" data-type="affirmation" data-text="${encodeURIComponent(aff)}" class="p-2 bg-teal text-white rounded-full">
+                                ${ICONS.Plus({size: 16})}
+                            </button>
+                        </div>
                     </div>`;
         }).join('');
     };
@@ -2467,6 +2491,7 @@ Example for topic "gratitude":
 
         const resultsContainer = document.getElementById('rewrite-results-container');
         resultsContainer.innerHTML = `<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+        const colors = getTextColorClasses();
         
         let alternatives = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
@@ -2499,10 +2524,15 @@ Original Mantra: "${mantra.text.original}"
         
         resultsContainer.innerHTML = alternatives.map(alt => {
             return `<div class="glass-card p-3 flex justify-between items-center">
-                        <span>"${alt}"</span>
-                        <button data-action="open-rewrite-confirmation" data-mantra-id="${mantra.id}" data-text="${encodeURIComponent(alt)}" class="p-2 bg-teal text-white rounded-full">
-                            Use this
-                        </button>
+                        <span class="flex-grow pr-2">"${alt}"</span>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <button data-action="speak-mantra" data-identifier="${btoa(alt)}" data-text="${encodeURIComponent(alt)}" class="p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" aria-label="Listen to suggestion" title="Listen">
+                                ${ICONS.Volume2({size: 16})}
+                            </button>
+                            <button data-action="open-rewrite-confirmation" data-mantra-id="${mantra.id}" data-text="${encodeURIComponent(alt)}" class="p-2 bg-teal text-white rounded-full">
+                                Use this
+                            </button>
+                        </div>
                     </div>`;
         }).join('');
     };
@@ -2596,7 +2626,7 @@ Original Mantra: "${mantra.text.original}"
             isRecordingAiTopic = false;
             renderAiGenerateModal(); // Re-render to show idle state
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderModal('Microphone Permission Required', 'Please allow microphone access in your browser settings to record voice mantras.');
+                renderModal('Microphone Permission Required', 'To record a topic with your voice, MantraOS needs microphone access. Please update the permission in your browser\'s site settings (usually via the lock icon in the address bar).');
             } else {
                 renderModal('Microphone Error', 'Could not access the microphone.');
             }
@@ -2708,7 +2738,7 @@ Original Mantra: "${mantra.text.original}"
         } catch (err) {
             console.error("Error accessing microphone for Onboarding AI:", err);
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderOnboardingAiDemoState('error', { message: 'Microphone Permission Required. Please allow access in your browser settings.' });
+                renderOnboardingAiDemoState('error', { message: 'Microphone permission denied. To try this feature, please allow access in your browser\'s site settings.' });
             } else {
                 renderOnboardingAiDemoState('error', { message: 'Microphone not found.' });
             }
@@ -2716,12 +2746,27 @@ Original Mantra: "${mantra.text.original}"
     };
 
     // --- APP ROUTING & INITIALIZATION ---
+    const handleSpeechEnd = () => {
+        const oldIdentifier = currentlySpeakingIdentifier;
+        currentlySpeakingIdentifier = null;
+        if(oldIdentifier) {
+            const button = document.querySelector(`[data-action="speak-mantra"][data-identifier="${oldIdentifier}"]`);
+            if (button) {
+                const size = button.querySelector('svg')?.getAttribute('width') || 18;
+                button.innerHTML = ICONS.Volume2({ size });
+            }
+        }
+    };
+
     const handleHashChange = () => {
         const path = window.location.hash.slice(1) || '/';
         
         // STOP SLIDESHOW & AUDIO ON EVERY PAGE CHANGE
         stopSlideshow();
         stopPlayback();
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
         
         if (!state.isOnboardingComplete && !path.startsWith('/onboarding')) {
             window.location.hash = '/onboarding/welcome';
@@ -3068,6 +3113,32 @@ Original Mantra: "${mantra.text.original}"
                     }
                     break;
                 }
+                case 'speak-mantra': {
+                    const text = decodeURIComponent(target.dataset.text);
+                    const identifier = target.dataset.identifier;
+                    const iconSize = target.querySelector('svg')?.getAttribute('width') || 18;
+
+                    const isSpeakingThis = window.speechSynthesis.speaking && currentlySpeakingIdentifier === identifier;
+
+                    // Stop whatever is happening
+                    window.speechSynthesis.cancel();
+                    handleSpeechEnd(); // Manually reset previous state
+
+                    if (isSpeakingThis) {
+                        // If we were speaking this, we just wanted to stop. So we're done.
+                        break;
+                    }
+
+                    // Otherwise, start new speech
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.onend = handleSpeechEnd;
+                    
+                    currentlySpeakingIdentifier = identifier;
+                    target.innerHTML = ICONS.Music4({ size: iconSize });
+                    window.speechSynthesis.speak(utterance);
+                    break;
+                }
+
 
                 // Undo/Redo
                 case 'undo': undo(); break;
