@@ -683,6 +683,13 @@
     };
 
     const goToNextMantra = () => {
+        // Guard to prevent slideshow from navigating user back to dashboard
+        const currentPath = window.location.hash.slice(1) || '/';
+        if (currentPath !== '/dashboard' && currentPath !== '/') {
+            stopSlideshow();
+            return;
+        }
+
         const newIndex = (state.currentMantraIndex + 1) % state.userMantras.length;
         state.currentMantraIndex = newIndex;
         renderTransitionParticles();
