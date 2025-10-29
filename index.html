@@ -388,6 +388,7 @@
         celebrationSounds: { enabled: true },
         haptics: { enabled: true },
         slideshow: { enabled: false, interval: 6 }, // interval in seconds
+        speechRate: 1.0,
         aiFeatures: { enabled: true },
         demoMode: { enabled: false },
         language: 'auto',
@@ -2177,6 +2178,14 @@
                          ${toggle('celebrationSounds.enabled', 'Celebration Sounds')}
                          ${toggle('haptics.enabled', 'Haptic Feedback')}
                          <div class="flex justify-between items-center">
+                            <span>Speaking Speed</span>
+                             <div class="flex items-center gap-2">
+                                <span class="text-sm">Slower</span>
+                                <input type="range" min="0.5" max="2" step="0.1" value="${settings.speechRate}" data-setting="speechRate" class="w-24 ${colors.accentCheckbox}">
+                                <span class="text-sm">Faster</span>
+                            </div>
+                         </div>
+                         <div class="flex justify-between items-center">
                             <span>Slideshow Speed</span>
                              <div class="flex items-center gap-2">
                                 <span class="text-sm">Slow</span>
@@ -3167,6 +3176,7 @@ Original Mantra: "${mantra.text.original}"
                      break;
                 
                 // AI Features
+                case 'proofread-mantra': handleProofreadMantra(); break;
                 case 'open-ai-generate-modal': renderAiGenerateModal(); break;
                 case 'start-ai-topic-recording': startAiTopicRecording(); break;
                 case 'stop-ai-topic-recording': stopAiTopicRecording(); break;
@@ -3269,6 +3279,7 @@ Original Mantra: "${mantra.text.original}"
 
                     // Otherwise, start new speech
                     const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = state.settings.speechRate;
                     utterance.onend = handleSpeechEnd;
                     
                     currentlySpeakingIdentifier = identifier;
@@ -3292,7 +3303,7 @@ Original Mantra: "${mantra.text.original}"
                 if (settingTarget.type === 'checkbox') {
                     value = settingTarget.checked;
                 } else {
-                    value = settingTarget.type === 'range' ? parseInt(settingTarget.value, 10) : settingTarget.value;
+                    value = settingTarget.type === 'range' ? parseFloat(settingTarget.value) : settingTarget.value;
                 }
                 setNestedValue(state.settings, path, value);
                 saveState();
@@ -3326,6 +3337,47 @@ Original Mantra: "${mantra.text.original}"
             }
         });
         audioPlayer.addEventListener('ended', stopPlayback);
+    };
+    
+    const handleProofreadMantra = async () => {
+        const textarea = document.getElementById('mantra-form-text');
+        const button = document.getElementById('proofread-button');
+        if (!textarea || !button) return;
+
+        const originalText = textarea.value.trim();
+        if (!originalText) {
+            renderToast('Please enter some text to proofread.');
+            return;
+        }
+
+        const originalButtonContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = `<div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin mx-auto"></div>`;
+
+        let proofreadText = '';
+        try {
+            if (isAnyAiFeatureEnabled() && state.aiStatus.proofreader) {
+                const proofreader = await window.ai.proofreader.create();
+                const result = await proofreader.proofread(originalText);
+                proofreadText = result.processedText;
+            } else {
+                // Demo mode fallback
+                await new Promise(r => setTimeout(r, 1000));
+                proofreadText = `[Demo] ${originalText.charAt(0).toUpperCase() + originalText.slice(1)}`;
+                if (!proofreadText.endsWith('.') && !proofreadText.endsWith('!') && !proofreadText.endsWith('?')) {
+                    proofreadText += '.';
+                }
+            }
+            textarea.value = proofreadText;
+            renderToast('Proofreading complete!');
+        } catch (e) {
+            console.error("Proofreading error:", e);
+            renderToast('Could not proofread text.');
+            textarea.value = originalText; // Restore original on error
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalButtonContent;
+        }
     };
     
     const handleMantraFormSubmit = (mantraId) => {
@@ -3363,6 +3415,16 @@ Original Mantra: "${mantra.text.original}"
         const colors = getTextColorClasses();
         const isEditing = mantra !== null;
 
+        const proofreadButton = (isAnyAiFeatureEnabled() && state.aiStatus.proofreader) ? `
+            <div class="text-left">
+                ${renderButton(`${ICONS.CheckCircle({className: 'inline mr-2', size: 18})} Proofread with AI`, {
+                    variant: 'secondary',
+                    additionalClasses: 'py-2 px-4 text-sm',
+                    attributes: 'id="proofread-button" data-action="proofread-mantra"'
+                })}
+            </div>
+        ` : '';
+
         const modalHTML = `
             <div id="${modalId}" class="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in">
                 <div class="glass-card w-full max-w-md rounded-2xl p-6 animate-slide-in-up">
@@ -3372,6 +3434,7 @@ Original Mantra: "${mantra.text.original}"
                     </div>
                     <form onsubmit="return false;" class="space-y-4">
                         <textarea id="mantra-form-text" class="w-full h-28 p-3 ${colors.bgMuted} rounded-lg ${colors.placeholder} focus:outline-none focus:ring-2 ${colors.ring}" placeholder="e.g., I am a creative powerhouse.">${mantra?.text?.original || ''}</textarea>
+                        ${proofreadButton}
                         <select id="mantra-form-category" class="w-full p-3 ${colors.bgMuted} rounded-lg focus:outline-none focus:ring-2 ${colors.ring}">
                             ${CATEGORIES.map(cat => `<option value="${cat}" ${mantra?.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
                         </select>
