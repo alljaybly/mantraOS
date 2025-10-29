@@ -7,6 +7,9 @@
   
   <!-- Tailwind CDN used for hackathon simplicity; compile for production -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -401,6 +404,7 @@
       userAffirmations: [],
       settings: JSON.parse(JSON.stringify(defaultSettings)), // Deep copy
       progress: {},
+      viewHistory: {}, // New: {'YYYY-MM-DD': count}
       isOnboardingComplete: false,
       achievements: INITIAL_ACHIEVEMENTS,
       currentMantraIndex: 0,
@@ -425,6 +429,7 @@
         affirmations: 'mantraos_user_affirmations',
         settings: 'mantraos_settings',
         progress: 'mantraos_progress',
+        viewHistory: 'mantraos_view_history',
         onboarding: 'mantraos_onboarding_complete',
         achievements: 'mantraos_achievements',
         dailyAffirmation: 'mantraos_daily_affirmation',
@@ -441,6 +446,7 @@
             localStorage.setItem(storageKeys.affirmations, JSON.stringify(state.userAffirmations));
             localStorage.setItem(storageKeys.settings, JSON.stringify(state.settings));
             localStorage.setItem(storageKeys.progress, JSON.stringify(state.progress));
+            localStorage.setItem(storageKeys.viewHistory, JSON.stringify(state.viewHistory));
             localStorage.setItem(storageKeys.onboarding, JSON.stringify(state.isOnboardingComplete));
             localStorage.setItem(storageKeys.achievements, JSON.stringify(state.achievements));
             localStorage.setItem(storageKeys.dailyAffirmation, JSON.stringify(state.dailyAffirmation));
@@ -522,6 +528,7 @@
             }
 
             state.progress = JSON.parse(localStorage.getItem(storageKeys.progress)) || {};
+            state.viewHistory = JSON.parse(localStorage.getItem(storageKeys.viewHistory)) || {};
             state.isOnboardingComplete = JSON.parse(localStorage.getItem(storageKeys.onboarding)) || false;
             state.achievements = JSON.parse(localStorage.getItem(storageKeys.achievements)) || INITIAL_ACHIEVEMENTS;
             state.dailyAffirmation = JSON.parse(localStorage.getItem(storageKeys.dailyAffirmation)) || null;
@@ -660,15 +667,22 @@
         if (!mantraId) return;
         const today = formatDate(new Date());
 
+        // Update progress for streaks and per-mantra stats
         if (!state.progress[mantraId]) {
             state.progress[mantraId] = { views: 0, lastViewed: '' };
         }
         state.progress[mantraId].views += 1;
         state.progress[mantraId].lastViewed = today;
+        
+        // Update daily view history for new charts
+        state.viewHistory[today] = (state.viewHistory[today] || 0) + 1;
+
+        // Check achievements
         unlockAchievement('first_view');
         const totalViews = getTotalViews();
         if (totalViews >= 100) unlockAchievement('100_views');
         if (getStreak() >= 7) unlockAchievement('7_day_streak');
+        
         saveState();
         checkForCelebrations();
     };
@@ -1920,12 +1934,82 @@
       `;
     };
 
+    let frequencyChartInstance = null;
+    const renderFrequencyChart = () => {
+        const ctx = document.getElementById('frequencyChart');
+        if (!ctx) return;
+
+        if (frequencyChartInstance) {
+            frequencyChartInstance.destroy();
+        }
+
+        const colors = getTextColorClasses();
+        const labels = [];
+        const data = [];
+        
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = formatDate(d);
+            labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+            data.push(state.viewHistory[dateStr] || 0);
+        }
+
+        frequencyChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Mantra Views',
+                    data: data,
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#4facfe',
+                    pointBorderColor: '#fff',
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: colors.needsDarkText ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
+                        },
+                        ticks: {
+                            color: colors.secondary,
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: colors.secondary,
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    };
+
     const renderProgress = () => {
         const colors = getTextColorClasses();
         const streak = getStreak();
         const longestStreak = getLongestStreak();
         const totalViews = getTotalViews();
-        const today = formatDate(new Date());
 
         const calendarDays = () => {
             let daysHtml = '';
@@ -1934,7 +2018,9 @@
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
 
-            const viewedDates = new Set(Object.values(state.progress).map(p => p.lastViewed));
+            const monthDates = Object.keys(state.viewHistory).filter(d => d.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`));
+            const monthViews = monthDates.map(d => state.viewHistory[d]);
+            const maxViews = monthViews.length > 0 ? Math.max(...monthViews) : 1;
 
             const dayOfWeek = firstDay.getDay(); // Sunday - 0, Monday - 1, etc.
             for (let i = 0; i < dayOfWeek; i++) {
@@ -1942,10 +2028,19 @@
             }
 
             for (let day = 1; day <= lastDay.getDate(); day++) {
-                const dateStr = formatDate(new Date(year, month, day));
-                const isViewed = viewedDates.has(dateStr);
-                const isToday = dateStr === today;
-                daysHtml += `<div class="h-10 flex items-center justify-center rounded-full ${isViewed ? 'bg-teal text-white font-bold' : ''} ${isToday && !isViewed ? `ring-2 ${colors.needsDarkText ? 'ring-charcoal' : 'ring-white'}` : ''}">${day}</div>`;
+                const date = new Date(year, month, day);
+                const dateStr = formatDate(date);
+                const viewCount = state.viewHistory[dateStr] || 0;
+                
+                let bgColor = 'transparent';
+                if (viewCount > 0) {
+                    const opacity = 0.2 + (0.8 * (viewCount / maxViews)); // Scale from 0.2 to 1.0
+                    bgColor = `rgba(79, 172, 254, ${opacity})`; // Teal with variable opacity
+                }
+
+                const textColor = viewCount > 0 ? 'text-white font-bold' : '';
+
+                daysHtml += `<div class="h-10 flex items-center justify-center rounded-full transition-colors ${textColor}" style="background-color: ${bgColor};" title="${date.toLocaleDateString()}: ${viewCount} views">${day}</div>`;
             }
             return daysHtml;
         };
@@ -1974,6 +2069,13 @@
             </div>
 
             <div class="glass-card p-4 rounded-2xl mb-8">
+                 <h2 class="text-2xl font-serif text-center mb-4">Views Over Last 30 Days</h2>
+                 <div class="h-64">
+                    <canvas id="frequencyChart"></canvas>
+                 </div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl mb-8">
                 <div class="flex justify-between items-center mb-4">
                     <button data-action="prev-month" class="p-2 rounded-full ${colors.bgMuted} ${colors.bgHover}" aria-label="Previous month">${ICONS.ArrowLeft({})}</button>
                     <h2 class="text-xl font-serif">${calendarViewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
@@ -1984,6 +2086,11 @@
                 </div>
                 <div class="grid grid-cols-7 gap-2 mt-2" id="calendar-grid">
                     ${calendarDays()}
+                </div>
+                 <div class="flex items-center justify-center gap-2 mt-4 text-sm ${colors.tertiary}">
+                    <span>Less</span>
+                    <div class="w-24 h-4 rounded-full" style="background: linear-gradient(to right, rgba(79, 172, 254, 0.2), rgba(79, 172, 254, 1));"></div>
+                    <span>More</span>
                 </div>
             </div>
 
@@ -2003,6 +2110,7 @@
             </div>
         `;
         renderPage(content, { showBackButton: true });
+        renderFrequencyChart();
     };
 
     const renderSettings = () => {
@@ -2077,6 +2185,36 @@
                             </div>
                          </div>
                          ${toggle('slideshow.enabled', 'Enable Slideshow')}
+                     </div>
+                </div>
+
+                <div class="glass-card p-4 rounded-2xl">
+                     <h2 class="text-xl font-serif mb-3">Notifications</h2>
+                     <div class="space-y-4">
+                         ${toggle('notifications.mantras.enabled', 'Mantra Reminders')}
+                         ${getNestedValue(settings, 'notifications.mantras.enabled') ? `
+                            <div class="pl-4 border-l-2 ${colors.border} space-y-3">
+                                <div class="flex justify-between items-center">
+                                    ${toggle('notifications.mantras.morning.enabled', 'Morning')}
+                                    <input type="time" data-setting="notifications.mantras.morning.time" value="${settings.notifications.mantras.morning.time}" class="p-1 rounded ${colors.bgMuted} ${!settings.notifications.mantras.morning.enabled ? 'opacity-50' : ''}" ${!settings.notifications.mantras.morning.enabled ? 'disabled' : ''}>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    ${toggle('notifications.mantras.afternoon.enabled', 'Afternoon')}
+                                    <input type="time" data-setting="notifications.mantras.afternoon.time" value="${settings.notifications.mantras.afternoon.time}" class="p-1 rounded ${colors.bgMuted} ${!settings.notifications.mantras.afternoon.enabled ? 'opacity-50' : ''}" ${!settings.notifications.mantras.afternoon.enabled ? 'disabled' : ''}>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    ${toggle('notifications.mantras.evening.enabled', 'Evening')}
+                                    <input type="time" data-setting="notifications.mantras.evening.time" value="${settings.notifications.mantras.evening.time}" class="p-1 rounded ${colors.bgMuted} ${!settings.notifications.mantras.evening.enabled ? 'opacity-50' : ''}" ${!settings.notifications.mantras.evening.enabled ? 'disabled' : ''}>
+                                </div>
+                            </div>
+                         ` : ''}
+                         <div class="pt-3 border-t ${colors.border}">
+                            <div class="flex justify-between items-center">
+                                ${toggle('notifications.affirmation.enabled', 'Daily Affirmation Reminder')}
+                                <input type="time" data-setting="notifications.affirmation.time" value="${settings.notifications.affirmation.time}" class="p-1 rounded ${colors.bgMuted} ${!settings.notifications.affirmation.enabled ? 'opacity-50' : ''}" ${!settings.notifications.affirmation.enabled ? 'disabled' : ''}>
+                            </div>
+                        </div>
+                        <p class="text-xs ${colors.tertiary}">Note: Notifications are locally scheduled and require the app or browser to be running in the background.</p>
                      </div>
                 </div>
 
