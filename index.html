@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MantraOS</title>
-  <link rel="icon" href="icon-192.png" type="image/png">
+  
   <!-- Tailwind CDN used for hackathon simplicity; compile for production -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -256,61 +256,50 @@
     };
 
     // --- CHROME AI ---
-    let aiTextSession = null;
-    let aiTranslator = null;
+    let languageModelSession = null;
     const isAnyAiFeatureEnabled = () => state.settings.aiFeatures.enabled && (state.aiStatus.supported || state.settings.demoMode.enabled);
 
     const checkAiStatus = async () => {
-        console.log('[MantraOS AI Diagnostics] Starting AI feature check...');
+        console.log('[MantraOS AI Diagnostics] Starting AI feature check with LanguageModel API...');
         const status = {
             checked: true,
-            supported: typeof window.ai !== 'undefined',
+            supported: 'LanguageModel' in window,
             text: false,
             translator: false,
             rewriter: false,
             proofreader: false,
-            assistant: false
+            assistant: false // Assistant with audio input is deprecated in the new API
         };
 
         if (status.supported) {
-            console.log('[MantraOS AI Diagnostics] window.ai object found.');
             try {
-                await window.ai.createTextSession();
-                status.text = true;
-                console.log('[MantraOS AI Diagnostics] createTextSession: Available');
-            } catch (e) { console.log('[MantraOS AI Diagnostics] createTextSession: Unavailable', e.message); }
-
-            try {
-                await window.ai.translator.create();
-                status.translator = true;
-                console.log('[MantraOS AI Diagnostics] translator.create: Available');
-            } catch (e) { console.log('[MantraOS AI Diagnostics] translator.create: Unavailable', e.message); }
-
-            try {
-                await window.ai.rewriter.create();
-                status.rewriter = true;
-                console.log('[MantraOS AI Diagnostics] rewriter.create: Available');
-            } catch (e) { console.log('[MantraOS AI Diagnostics] rewriter.create: Unavailable', e.message); }
-
-            try {
-                await window.ai.proofreader.create();
-                status.proofreader = true;
-                console.log('[MantraOS AI Diagnostics] proofreader.create: Available');
-            } catch (e) { console.log('[MantraOS AI Diagnostics] proofreader.create: Unavailable', e.message); }
-
-            try {
-                if (window.ai.assistant && await window.ai.assistant.canPrompt({audio: true})) {
-                    status.assistant = true;
-                    console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Available');
+                const modelCheck = await LanguageModel.canCreate();
+                if (modelCheck === 'readily') {
+                    status.text = true;
+                    // All text-based features are now enabled if the model is ready
+                    status.translator = true;
+                    status.rewriter = true;
+                    status.proofreader = true;
+                    console.log('[MantraOS AI Diagnostics] LanguageModel is readily available.');
                 } else {
-                     console.log('[MantraOS AI Diagnostics] assistant.canPrompt({audio: true}): Unavailable');
-                     renderToast('AI audio input unavailable.');
+                    console.log(`[MantraOS AI Diagnostics] LanguageModel status is '${modelCheck}'. Disabling for this session to avoid download prompts.`);
+                    status.supported = false; // Treat as unsupported if not 'readily' available.
                 }
-            } catch (e) { console.log('[MantraOS AI Diagnostics] assistant.canPrompt: Unavailable', e.message); }
-        } else {
-            console.log('[MantraOS AI Diagnostics] window.ai object not found. AI features are unavailable.');
-            renderToast('AI features unavailable. Using demo mode.');
+            } catch (e) {
+                console.log('[MantraOS AI Diagnostics] LanguageModel.canCreate() failed:', e.message);
+                status.supported = false;
+            }
         }
+
+        if (!status.supported) {
+            console.log('[MantraOS AI Diagnostics] LanguageModel API not found or not ready. AI features will use demo mode.');
+            if (!state.aiStatus.checked) { // Only show toast on first check
+                renderToast('AI features unavailable. Using demo mode.');
+            }
+        }
+        
+        console.log('[MantraOS AI Diagnostics] Audio-to-text assistant is not supported by the new API; multimodal features will use demo mode.');
+        
         state.aiStatus = status;
         console.log('[MantraOS AI Diagnostics] Check complete. Final status:', state.aiStatus);
     };
@@ -2267,10 +2256,12 @@
                         <button data-action="rerun-ai-check" class="ml-auto p-2 ${colors.bgMuted} ${colors.bgHover} rounded-full" title="Rerun Diagnostics">${ICONS.RotateCw({size: 16})}</button>
                      </h2>
                      <div class="space-y-2 text-sm ${colors.secondary}">
-                        <div class="flex justify-between"><span>Browser Support (window.ai)</span> ${aiStatusIndicator(state.aiStatus.supported)}</div>
-                        <div class="flex justify-between"><span>Text Generation</span> ${aiStatusIndicator(state.aiStatus.text)}</div>
-                        <div class="flex justify-between"><span>Translation</span> ${aiStatusIndicator(state.aiStatus.translator)}</div>
-                        <div class="flex justify-between"><span>Audio Assistant</span> ${aiStatusIndicator(state.aiStatus.assistant)}</div>
+                        <div class="flex justify-between"><span>Browser Support (LanguageModel)</span> ${aiStatusIndicator(state.aiStatus.supported)}</div>
+                        <div class="flex justify-between"><span>Text Capabilities (Generate, etc.)</span> ${aiStatusIndicator(state.aiStatus.text)}</div>
+                        <div class="flex justify-between items-center">
+                            <span>Audio Assistant (Multimodal)</span>
+                            <span class="flex items-center gap-2">${aiStatusIndicator(state.aiStatus.assistant)}<em class="text-xs ${colors.tertiary}">Demo only</em></span>
+                        </div>
                      </div>
                      <div class="mt-4 space-y-3">
                          ${toggle('aiFeatures.enabled', 'Enable On-Device AI')}
@@ -2460,7 +2451,7 @@
         let mantras = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
             try {
-                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                if (!languageModelSession) languageModelSession = await LanguageModel.create();
                 const { creativity, tone, length } = state.settings.aiSettings;
                 const prompt = `
 You are a highly skilled life coach specializing in positive psychology and affirmation crafting. Your task is to generate 5 unique, empowering, and motivational mantras based on the topic of "${topic}".
@@ -2477,7 +2468,7 @@ Follow these strict guidelines:
 Example for topic "wealth":
 ["I am a magnet for financial abundance.", "My income grows consistently and effortlessly.", "I am worthy of the wealth I desire.", "Prosperity flows to me from expected and unexpected sources.", "My relationship with money is healthy and positive."]
 `;
-                const result = await aiTextSession.prompt(prompt);
+                const result = await languageModelSession.prompt(prompt);
                 mantras = JSON.parse(result.match(/\[.*\]/s)[0]); // Loosely parse JSON from a potentially messy string
             } catch (e) {
                 console.error('AI Mantra Generation Error:', e);
@@ -2521,7 +2512,7 @@ Example for topic "wealth":
         let affirmations = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
             try {
-                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                if (!languageModelSession) languageModelSession = await LanguageModel.create();
                 const { tone } = state.settings.aiSettings;
                 const prompt = `
 You are an expert in crafting uplifting daily affirmations. Your goal is to generate 5 short, positive, and inspiring affirmations related to the theme of "${topic}". These are meant to be read once a day to set a positive tone.
@@ -2536,7 +2527,7 @@ Please adhere to these rules:
 Example for topic "gratitude":
 ["I am thankful for the simple joys of today.", "My heart is open to all the good surrounding me.", "I appreciate the lessons in every experience.", "I find reasons to be grateful in every moment.", "Today, I choose to focus on what I have."]
 `;
-                const result = await aiTextSession.prompt(prompt);
+                const result = await languageModelSession.prompt(prompt);
                 affirmations = JSON.parse(result);
             } catch (e) {
                 console.error('AI Affirmation Generation Error:', e);
@@ -2578,9 +2569,11 @@ Example for topic "gratitude":
         let translatedText = '';
         if (isAnyAiFeatureEnabled() && state.aiStatus.translator) {
             try {
-                if (!aiTranslator) aiTranslator = await window.ai.translator.create();
-                const result = await aiTranslator.translate(mantra.text.original, 'en', targetLang);
-                translatedText = result.translatedText;
+                if (!languageModelSession) languageModelSession = await LanguageModel.create();
+                const targetLanguageName = SUPPORTED_LANGUAGES[targetLang] || 'the selected language';
+                const prompt = `Translate the following English text to ${targetLanguageName}. Return ONLY the translated text, with no additional explanation, quotes, or formatting. Text to translate: "${mantra.text.original}"`;
+                const result = await languageModelSession.prompt(prompt);
+                translatedText = result.trim().replace(/^["']|["']$/g, '');
             } catch (e) {
                 console.error("AI Translation Error:", e);
                 translatedText = `[Demo] Translation of "${mantra.text.original}" to ${targetLang}.`;
@@ -2643,7 +2636,7 @@ Example for topic "gratitude":
         let alternatives = [];
         if (isAnyAiFeatureEnabled() && state.aiStatus.text) {
             try {
-                if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
+                if (!languageModelSession) languageModelSession = await LanguageModel.create();
                 const { creativity, tone, length } = state.settings.aiSettings;
                 const prompt = `
 You are an expert editor specializing in motivational content. Your task is to rephrase the following mantra to offer alternative perspectives while preserving its core positive meaning: "${mantra.text.original}"
@@ -2657,7 +2650,7 @@ Follow these guidelines:
 
 Original Mantra: "${mantra.text.original}"
 `;
-                const result = await aiTextSession.prompt(prompt);
+                const result = await languageModelSession.prompt(prompt);
                 alternatives = JSON.parse(result.match(/\[.*\]/s)[0]);
             } catch (e) {
                 console.error('AI Rewrite Error:', e);
@@ -2696,88 +2689,33 @@ Original Mantra: "${mantra.text.original}"
     };
 
     const startAiTopicRecording = async () => {
+        // The new LanguageModel API does not support audio input. This feature now exclusively uses a simulation.
+        // This preserves the multimodal UX for the hackathon.
         if (!isAnyAiFeatureEnabled() || !state.aiStatus.assistant) {
-            renderToast('AI audio input is not available.');
+            const topicInput = document.getElementById('ai-generate-topic');
+            const micButtonContainer = document.getElementById('ai-mic-button-container');
+            
+            if (topicInput) topicInput.value = 'Simulating...';
+            if (micButtonContainer) micButtonContainer.innerHTML = `<div class="p-3"><div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin"></div></div>`;
+            
+            await new Promise(r => setTimeout(r, 1500));
+            const demoTopic = 'confidence';
+            if (topicInput) topicInput.value = demoTopic;
+            unlockAchievement('audio_mantra');
+            renderToast('Demo audio topic processed!');
+            
+            if (micButtonContainer) {
+                micButtonContainer.innerHTML = `
+                    <button id="ai-mic-button" data-action="start-ai-topic-recording" class="p-3 bg-teal text-white rounded-full" aria-label="Use microphone to provide topic" title="Use microphone">
+                        ${ICONS.Microphone({size: 20})}
+                    </button>
+                `;
+            }
+            // Automatically trigger generation with the demo topic
+            handleGenerateAiMantras();
             return;
         }
-        if (isRecordingAiTopic) stopAiTopicRecording();
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            isRecordingAiTopic = true;
-            aiTopicChunks = [];
-            renderAiGenerateModal(); // Re-render to show recording UI
-
-            aiTopicRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-
-            aiTopicRecorder.ondataavailable = event => {
-                aiTopicChunks.push(event.data);
-            };
-            
-            aiTopicRecorder.onstop = async () => {
-                const audioBlob = new Blob(aiTopicChunks, { type: 'audio/webm' });
-                stream.getTracks().forEach(track => track.stop());
-
-                const topicInput = document.getElementById('ai-generate-topic');
-                const micButton = document.getElementById('ai-mic-button');
-                const micButtonContainer = document.getElementById('ai-mic-button-container');
-                const colors = getTextColorClasses();
-
-                if (topicInput) topicInput.placeholder = 'Transcribing...';
-                if (micButton) micButton.innerHTML = `<div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin"></div>`;
-
-                try {
-                    const audioBuffer = await audioBlob.arrayBuffer();
-                    const result = await window.ai.assistant.prompt({ audio: audioBuffer });
-                    if (topicInput) {
-                        topicInput.value = result;
-                        topicInput.placeholder = 'e.g., Confidence, Calmness';
-                    }
-                    unlockAchievement('audio_mantra');
-                    renderToast('Transcription complete!');
-                } catch (e) {
-                    console.error("AI Transcription error:", e);
-                    renderToast('Could not transcribe audio.');
-                    if (topicInput) topicInput.placeholder = 'e.g., Confidence, Calmness';
-                } finally {
-                    if (micButtonContainer) {
-                        // Restore original mic button
-                        micButtonContainer.innerHTML = `
-                            <button id="ai-mic-button" data-action="start-ai-topic-recording" class="p-3 bg-teal text-white rounded-full" aria-label="Use microphone to provide topic" title="Use microphone">
-                                ${ICONS.Microphone({size: 20})}
-                            </button>
-                        `;
-                    }
-                }
-            };
-
-            aiTopicRecorder.start();
-            
-            // Auto-stop
-            aiTopicRecordingTimer = setTimeout(stopAiTopicRecording, MAX_AI_RECORDING_SECONDS * 1000);
-            
-            // UI Timer update
-            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
-            const timerEl = document.getElementById('ai-recording-timer');
-            if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
-
-            aiTopicRecordingInterval = setInterval(() => {
-                secondsRemaining--;
-                const timerEl = document.getElementById('ai-recording-timer');
-                if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
-                if (secondsRemaining <= 0) clearInterval(aiTopicRecordingInterval);
-            }, 1000);
-
-        } catch (err) {
-            console.error("Error accessing microphone for AI:", err);
-            isRecordingAiTopic = false;
-            renderAiGenerateModal(); // Re-render to show idle state
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderModal('Microphone Permission Required', 'To record a topic with your voice, MantraOS needs microphone access. Please update the permission in your browser\'s site settings (usually via the lock icon in the address bar).');
-            } else {
-                renderModal('Microphone Error', 'Could not access the microphone.');
-            }
-        }
+        // This part of the function is now unreachable due to API deprecation.
     };
 
     const stopOnboardingAiRecording = () => {
@@ -2791,7 +2729,9 @@ Original Mantra: "${mantra.text.original}"
     };
 
     const startOnboardingAiRecording = async () => {
-        if (!isAnyAiFeatureEnabled()) {
+        // Since the new LanguageModel API doesn't support audio input, this feature now always runs in a demo mode
+        // to showcase the intended multimodal functionality for the hackathon.
+        if (!isAnyAiFeatureEnabled() || !state.aiStatus.assistant) {
             renderOnboardingAiDemoState('processing', { message: 'Entering Demo Mode...' });
             await new Promise(r => setTimeout(r, 750));
             
@@ -2809,87 +2749,7 @@ Original Mantra: "${mantra.text.original}"
             renderOnboardingAiDemoState('result', { mantra: demoMantra, topic: 'creativity' });
             return;
         }
-        
-        if (onboardingAiRecorder && onboardingAiRecorder.state === 'recording') stopOnboardingAiRecording();
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            renderOnboardingAiDemoState('recording');
-            onboardingAiChunks = [];
-            
-            onboardingAiRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-
-            onboardingAiRecorder.ondataavailable = event => {
-                onboardingAiChunks.push(event.data);
-            };
-            
-            onboardingAiRecorder.onstop = async () => {
-                const audioBlob = new Blob(onboardingAiChunks, { type: 'audio/webm' });
-                stream.getTracks().forEach(track => track.stop());
-
-                renderOnboardingAiDemoState('processing', { message: 'Processing Audio...' });
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                renderOnboardingAiDemoState('processing', { message: 'Transcribing...' });
-
-                let topic = '';
-                try {
-                    const audioBuffer = await audioBlob.arrayBuffer();
-                    topic = await window.ai.assistant.prompt({ audio: audioBuffer });
-                } catch (e) {
-                    console.error("Onboarding AI Transcription error:", e);
-                    renderOnboardingAiDemoState('error', { message: 'Could not transcribe audio.' });
-                    return;
-                }
-
-                if (!topic) {
-                     renderOnboardingAiDemoState('error', { message: 'Could not understand topic.' });
-                     return;
-                }
-
-                renderOnboardingAiDemoState('processing', { message: 'Generating mantra...' });
-
-                let mantra = '';
-                try {
-                    if (!aiTextSession) aiTextSession = await window.ai.createTextSession();
-                    const prompt = `Generate one short, powerful, first-person mantra about "${topic}". Return only the mantra text as a single string. Do not include quotes or any other text.`;
-                    const rawMantra = await aiTextSession.prompt(prompt);
-                    mantra = rawMantra.replace(/^["']|["']$/g, '');
-                } catch (e) {
-                    console.error('Onboarding AI Mantra Generation Error:', e);
-                    renderOnboardingAiDemoState('error', { message: 'Could not generate mantra.' });
-                    return;
-                }
-                
-                unlockAchievement('audio_mantra');
-                renderOnboardingAiDemoState('result', { mantra, topic });
-            };
-
-            onboardingAiRecorder.start();
-            
-            // Auto-stop
-            onboardingAiTimer = setTimeout(stopOnboardingAiRecording, MAX_AI_RECORDING_SECONDS * 1000);
-            
-            // UI Timer update
-            let secondsRemaining = MAX_AI_RECORDING_SECONDS;
-            const timerEl = document.getElementById('onboarding-ai-timer');
-            if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
-
-            onboardingAiInterval = setInterval(() => {
-                secondsRemaining--;
-                const timerEl = document.getElementById('onboarding-ai-timer');
-                if (timerEl) timerEl.textContent = `${secondsRemaining}s`;
-                if (secondsRemaining <= 0) clearInterval(onboardingAiInterval);
-            }, 1000);
-
-        } catch (err) {
-            console.error("Error accessing microphone for Onboarding AI:", err);
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                renderOnboardingAiDemoState('error', { message: 'Microphone permission denied. To try this feature, please allow access in your browser\'s site settings.' });
-            } else {
-                renderOnboardingAiDemoState('error', { message: 'Microphone not found.' });
-            }
-        }
+        // This part of the function is now unreachable due to API deprecation.
     };
 
     // --- APP ROUTING & INITIALIZATION ---
@@ -3355,29 +3215,30 @@ Original Mantra: "${mantra.text.original}"
         button.innerHTML = `<div class="w-5 h-5 border-2 border-current/20 border-t-current rounded-full animate-spin mx-auto"></div>`;
 
         let proofreadText = '';
-        try {
-            if (isAnyAiFeatureEnabled() && state.aiStatus.proofreader) {
-                const proofreader = await window.ai.proofreader.create();
-                const result = await proofreader.proofread(originalText);
-                proofreadText = result.processedText;
-            } else {
-                // Demo mode fallback
-                await new Promise(r => setTimeout(r, 1000));
-                proofreadText = `[Demo] ${originalText.charAt(0).toUpperCase() + originalText.slice(1)}`;
-                if (!proofreadText.endsWith('.') && !proofreadText.endsWith('!') && !proofreadText.endsWith('?')) {
-                    proofreadText += '.';
-                }
+        if (isAnyAiFeatureEnabled() && state.aiStatus.proofreader) {
+            try {
+                if (!languageModelSession) languageModelSession = await LanguageModel.create();
+                const prompt = `Proofread and correct any spelling or grammatical errors in the following text. Return ONLY the corrected text, with no additional explanation or formatting. Text to proofread: "${originalText}"`;
+                const result = await languageModelSession.prompt(prompt);
+                proofreadText = result.trim();
+            } catch (e) {
+                console.error("Proofreading error:", e);
+                renderToast('Could not proofread text.');
+                proofreadText = originalText; // Restore original on error
             }
-            textarea.value = proofreadText;
-            renderToast('Proofreading complete!');
-        } catch (e) {
-            console.error("Proofreading error:", e);
-            renderToast('Could not proofread text.');
-            textarea.value = originalText; // Restore original on error
-        } finally {
-            button.disabled = false;
-            button.innerHTML = originalButtonContent;
+        } else {
+            // Demo mode fallback
+            await new Promise(r => setTimeout(r, 1000));
+            proofreadText = `[Demo] ${originalText.charAt(0).toUpperCase() + originalText.slice(1)}`;
+            if (!proofreadText.endsWith('.') && !proofreadText.endsWith('!') && !proofreadText.endsWith('?')) {
+                proofreadText += '.';
+            }
         }
+        textarea.value = proofreadText;
+        renderToast('Proofreading complete!');
+
+        button.disabled = false;
+        button.innerHTML = originalButtonContent;
     };
     
     const handleMantraFormSubmit = (mantraId) => {
