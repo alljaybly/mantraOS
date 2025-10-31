@@ -1,3 +1,18 @@
+# MantraOS - AI-Powered Motivation App
+
+## Quick Start
+1. Visit: https://mantraos.netlify.app
+2. Install as PWA (browser install prompt)
+3. Start using immediately
+
+## Local Development
+1. Clone this repository
+2. Open `index.html` in a web server
+3. For Chrome AI features: Use Chrome Canary with AI flags enabled
+
+## License
+MIT License - See LICENSE file for details
+
 # MantraOS ✨
 
 **MantraOS** is a motivational PWA supercharged with on-device AI, submitted to the Google Chrome Built-in AI Challenge 2025. It's designed to excel in the **"Best Multimodal AI Application"** category by transforming spoken intentions into powerful, personalized mantras.
